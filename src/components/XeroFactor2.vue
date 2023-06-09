@@ -1,0 +1,290 @@
+<template>
+    <div class="factor-widget">
+        <div class="outer">
+            <p class="intro">Enter a positive integer to find its prime factors.</p>
+            <p>Computation happens <em>on your computer</em> so speed may vary. By 
+            definition 1 is not prime, so it is not accepted as input.</p>
+            <div class = "alert alert-danger" role="alert" v-if="isError">
+                An error has occurred.
+            </div>
+            <div class="row">
+                <div class="col-sm-4 col">
+                    <div class="col-inner">
+                        <div class="input-form">
+                            <form @submit.prevent="">
+                                <input
+                                    v-model="integerInput"
+                                    name="primary-number-input"
+                                    class="primary-number-input"
+                                    :class="invalidInput ? 'red-border' : ''"
+                                    type="text"
+                                />
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-8 col">
+                    <div class="col-inner">
+                        <span v-if="isError">
+                            An error occurred during computation. You can 
+                            usually correct this by removing your input value
+                            completely and then pasting it back in.
+                        </span>
+                        <span v-if="invalidInput">
+                            (invalid input)
+                        </span>
+                        <span class="factors-list" v-if="!isError && !invalidInput">
+                            =
+                            <span v-for="i in factors" :key="i.key" class="factor-item">
+                                ({{ i.string }})
+                            </span>
+                            <span ref="working">
+                                <span v-if="isWorking" class="is-working-message">
+                                    (WORKING){{ workingString }}
+                                </span>
+                            </span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+<script>
+import Debounce from "lodash.debounce";
+import { Decimal } from "decimal.js";
+import factorize from "../factorizer.js";
+
+Decimal.set({ precision : 64 });
+
+export default {
+    props : {
+        worker : {
+            default : () => {
+                return null;
+            }
+        },
+        done : {
+            type : Function,
+            default : () => {}
+        },
+        beginningWork : {
+            type : Function,
+            default : () => {}
+        },
+        workerFound : {
+            type : Function,
+            default : () => {
+                return false;
+            }
+        }
+    },
+    data () {
+        return {
+            integerInput : "2",
+            factors : [],
+            integer : new Decimal(2),
+            compositeNumbers : {},
+            isWorking : false,
+            invalidInput : false,
+            isError : false,
+            clearFactorize : () => {},
+            factorIndex : 0,
+            workingString : ""
+        };
+    },
+    watch : {
+        integerInput : Debounce(function (newValue, oldValue) {
+            console.log(`changed input: ${newValue}`);
+            let check = this.checkValidInput(newValue);
+            if (check) {
+                this.integer = new Decimal(newValue);
+                this.clear();
+                this.factor();
+            }
+        }, 100)
+    },
+    mounted () {
+        this.animateWaiting();
+        if (this.worker !== null) {
+            console.log("found web worker");
+            this.workerFound(true);
+        } else {
+            this.workerFound(false);
+        }
+        this.factor();
+    },
+    methods : {
+        checkValidInput (input) {
+            let test;
+            if (input.length == 0) {
+                test = false;
+            }
+            let pattern = new RegExp(/^\d+$/);
+            let match = pattern.exec(input);
+            if (match !== null && match[0] === input) {
+                test = true;
+            } else {
+                test = false;
+            }
+            this.invalidInput = !test;
+            return test;
+        },
+        animateWaiting () {
+            let div = this.$refs.working;
+            window.x = this;
+            setInterval(function () {
+                div.style.color = "green";
+                setTimeout(function () {
+                    div.style.color = "blue";
+                }, 500);
+            }, 1000);
+        },
+        clear () {
+            this.factors = [];
+            this.isError = false;
+            this.clearFactorize();
+            this.clearFactorize = undefined;
+        },
+        logState () {
+            function getFactorString () {
+                let factorString = "";
+                for (let factor of this.factors) {
+                    factorString = `${factorString}(${factor.string})`;
+                }
+                return factorString;
+            }
+            let factorString = getFactorString();
+            console.log(`input was ${this.integerInput}; factors: ${factorString};`);
+        },
+        pushFactor (val) {
+            console.log(`found factor: ${val}`);
+            let floor = val.floor();
+            if (!val.equals(floor)) {
+                this.logState();
+                this.isError = true;
+                throw new Error(`attempted to push non-integer factor ${val}`)
+            }
+            this.factors.push({
+                value : val,
+                string : val.toString(),
+                key : this.factorIndex
+            });
+            this.factorIndex++;
+        },
+        factor () {
+            this.beginningWork();
+            this.$emit("BeginWorking");
+            this.isWorking = true;
+            const getProduct = () => {
+                let product = new Decimal(1);
+                for (let i of this.factors) {
+                    product = product.times(i.value);
+                }
+                return product;
+            }
+            const obj = factorize(this.integer, this.worker, this);
+            const { observable, clear } = obj;
+            this.clearFactorize = clear;
+            observable.subscribe((event) => {
+                let product;
+                const status = event.status;
+                switch (status) {
+                    case "working":
+                        switch(this.workingString) {
+                            case "":
+                                this.workingString = "|";
+                                break;
+                            case "|":
+                                this.workingString = "/";
+                                break;
+                            case "/":
+                                this.workingString = "-";
+                                break;
+                            case "-":
+                                this.workingString = "\\";
+                                break;
+                            case "\\":
+                                this.workingString = "|";
+                                break;
+                            default:
+                                this.workingString = "-";
+                                break;
+                        }
+                        break;
+                    case "factor":
+                        this.pushFactor(event.payload.factor);
+                        break;
+                    case "error":
+                        this.isError = true;
+                        console.log(`an unexpected error occurred: ${event.payload.error.message}`);
+                        console.log(event.payload.error);
+                        break;
+                    case "success":
+                        this.isWorking = false;
+                        this.done();
+                        this.$emit("WorkComplete");
+                        product = getProduct();
+                        let test = (this.integer.equals(product));
+                        if (test) {
+                            console.log("passed product test");
+                        } else {
+                            console.log(`failed product test, product = ${product}`);
+                            this.isError = true;
+                        }
+                        break;
+                    default:
+                        console.log("An unknown error occurred");
+                        this.isError = true;
+                        break;
+                }   
+            });
+        }
+    }
+};
+</script>
+<style lang="scss">
+.factor-widget {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  .outer {
+    width: 100%;
+  }
+
+  .input-form {
+    text-align: center;
+    width: 100%;
+
+    input {
+      width: 100%;
+    }
+  }
+
+  .intro {
+    font-size: 18pt;
+  }
+
+  .col-inner {
+    height: 5em;
+    display: flex;
+    align-items: center;
+  }
+
+  .invalid {
+    position: relative;
+    bottom: 0px;
+    right: 0px;
+    font-size: 22pt;
+    background-color: yellow;
+  }
+
+  .red-border {
+    border-style: solid;
+    border-color: red;
+    box-shadow: 0 0 10px red;
+    outline: none;
+  }
+}
+</style>

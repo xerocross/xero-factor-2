@@ -1,0 +1,55 @@
+{
+  "name": "xero-factor-2",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore",
+    "format": "prettier --write src/",
+    "test": "jest"
+  },
+  "dependencies": {
+    "decimal.js": "^10.4.3",
+    "express": "^4.18.2",
+    "lodash.debounce": "^4.0.8",
+    "q": "^1.5.1",
+    "rxjs": "^7.8.1",
+    "vue": "^3.3.2"
+  },
+  "devDependencies": {
+    "@babel/preset-env": "^7.22.4",
+    "@rushstack/eslint-patch": "^1.2.0",
+    "@vitejs/plugin-vue": "^4.2.3",
+    "@vue/eslint-config-prettier": "^7.1.0",
+    "@vue/test-utils": "^2.3.2",
+    "@vue/vue3-jest": "^29.2.4",
+    "babel-jest": "^29.5.0",
+    "eslint": "^8.39.0",
+    "eslint-plugin-vue": "^9.11.0",
+    "jest": "^29.5.0",
+    "jest-environment-jsdom": "^29.5.0",
+    "prettier": "^2.8.8",
+    "sass": "^1.63.2",
+    "vite": "^4.3.5"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "vue"
+    ],
+    "transform": {
+      "^.+\\.vue$": "@vue/vue3-jest",
+      "^.+\\.jsx?$": "babel-jest"
+    },
+    "testEnvironment": "jsdom",
+    "testEnvironmentOptions": {
+      "customExportConditions": [
+        "node",
+        "node-addons"
+      ]
+    }
+  }
+}
