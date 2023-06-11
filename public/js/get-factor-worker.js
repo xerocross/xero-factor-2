@@ -1,5 +1,5 @@
 importScripts("decimal.js");
-self.addEventListener('message', function (event) {
+self.addEventListener("message", function (event) {
     // Access the data sent from the main thread
     const theNumber = event.data.integer;
     const result = doComputation(theNumber);

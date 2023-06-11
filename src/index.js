@@ -1,6 +1,6 @@
-import './assets/main.css'
+import "./assets/main.css"
 
-import { createApp } from 'vue'
+import { createApp } from "vue"
 import XeroFactor2 from "./components/XeroFactor2.vue";
 
 const myWorker = new Worker("js/get-factor-worker.js");
@@ -8,4 +8,4 @@ const myWorker = new Worker("js/get-factor-worker.js");
 createApp(XeroFactor2, {
     worker : myWorker
 })
-    .mount('#xero-factor-2')
+    .mount("#xero-factor-2")

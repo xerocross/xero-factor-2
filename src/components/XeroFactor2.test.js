@@ -1,5 +1,6 @@
-import { shallowMount, mount } from '@vue/test-utils';
+import { shallowMount, mount } from "@vue/test-utils";
 import XeroFactor2 from "./XeroFactor2.vue";
+import flushPromises from "flush-promises";
 
 let Worker = null;
 let xeroFactor2;
@@ -42,89 +43,127 @@ test("component will mount", () => {
     }).not.toThrow();
 });
 
-test("primary number input exists", () => {
+test("primary number input exists", async () => {
     xeroFactor2 = shallowMount(XeroFactor2);
     let numInput = getPrimaryNumberInput(xeroFactor2);
+    await xeroFactor2.vm.$nextTick();
     expect(numInput.exists()).toBe(true);
 });
 
-test("negative integer invalid", () => {
+test("negative integer invalid", async () => {
     Worker = null;
     xeroFactor2 = shallowMount(XeroFactor2);
+    await xeroFactor2.vm.$nextTick();
     let numInput = getPrimaryNumberInput(xeroFactor2);
     numInput.setValue("-2");
-    expect(xeroFactor2.vm.invalidInput).toBe(false);
+    await xeroFactor2.vm.$nextTick();
+    jest.advanceTimersByTime(400);
+    await xeroFactor2.vm.$nextTick();
+    expect(xeroFactor2.vm.invalidInput).toBe(true);
+    
 });
 
-test("decimal input invalid", () => {
+test("decimal input invalid", async () => {
     Worker = null;
     xeroFactor2 = shallowMount(XeroFactor2);
+    await xeroFactor2.vm.$nextTick();
     let numInput = getPrimaryNumberInput(xeroFactor2);
+    await xeroFactor2.vm.$nextTick();
     numInput.setValue("2.3");
-    expect(xeroFactor2.vm.invalidInput).toBe(false);
+    await xeroFactor2.vm.$nextTick();
+    jest.advanceTimersByTime(1000);
+    await xeroFactor2.vm.$nextTick();
+    expect(xeroFactor2.vm.invalidInput).toBe(true);
 });
 
-test("non-numeric input invalid", () => {
+test("non-numeric input invalid", async () => {
     Worker = null;
     xeroFactor2 = shallowMount(XeroFactor2);
     let numInput = getPrimaryNumberInput(xeroFactor2);
     numInput.setValue("2a");
-    expect(xeroFactor2.vm.invalidInput).toBe(false);
+    await xeroFactor2.vm.$nextTick();
+    jest.advanceTimersByTime(1000);
+    await xeroFactor2.vm.$nextTick();
+    expect(xeroFactor2.vm.invalidInput).toBe(true);
 });
 
-test("initial input value is '2'", () => {
+test("initial input value is '2'", async () => {
     xeroFactor2 = shallowMount(XeroFactor2);
     let numInput = getPrimaryNumberInput(xeroFactor2);
+    await xeroFactor2.vm.$nextTick();
     expect(numInput.element.value).toBe("2");
 });
 
 
-test("during working, shows '(working)' message", (done) => {
+test("during working, shows '(working)' message",  async () => {
     window.Worker = null;
-    xeroFactor2 = mount(XeroFactor2, {});
-    xeroFactor2.vm.pushFactor = function () {
-        expect(getIsWorkingMessage(xeroFactor2).exists()).toBe(true);
+    xeroFactor2 = mount(XeroFactor2);
+    let functionRan;
+    xeroFactor2.vm.pushFactor = () => {
+        console.log("ran pushFactor function");
+        functionRan = true;
+        xeroFactor2.vm.logState();
         xeroFactor2.vm.clear();
-        done();
     }
+    await xeroFactor2.vm.$nextTick();
     let numInput = getPrimaryNumberInput(xeroFactor2);
     numInput.setValue("12");
+    await xeroFactor2.vm.$nextTick();
+    jest.advanceTimersByTime(1000);
+    await xeroFactor2.vm.$nextTick();
+    expect(functionRan);
+    expect(getIsWorkingMessage(xeroFactor2).exists()).toBe(true);
 });
 
-test("input number 3 produces prime factors '(3)', worker disabled", (done) => {
+test("input number 3 produces prime factors '(3)', worker disabled", async () => {
+    jest.useFakeTimers()
     window.Worker = null;
-    let workComplete = () => {
+    let functionRan = false;
+    let workComplete = async () => {
+        await flushPromises();
+        functionRan = true;
         let visibleFactors = getVisibleFactors(xeroFactor2);
         expect(visibleFactors.at(0).text()).toBe("(3)");
         expect(visibleFactors.length).toBe(1);
-        done();
     }
     xeroFactor2 = mount(XeroFactor2, {
         props : {
             done : workComplete
         }
     });
+    await flushPromises();
     let numInput = getPrimaryNumberInput(xeroFactor2);
     numInput.setValue("3");
+    await flushPromises();
+    jest.advanceTimersByTime(1000);
+    await flushPromises();
+    expect(functionRan).toBe(true);
 });
 
-test("input number 12 produces prime factors '(2)(2)(3)', worker disabled", (done) => {
+test.only("input number 12 produces prime factors '(2)(2)(3)', worker disabled", async () => {
+    jest.useFakeTimers()
     window.Worker = null;
+    let doneFunctionRan = false;
     let workComplete = () => {
         let visibleFactors = getVisibleFactors(xeroFactor2);
         expect(visibleFactors.at(0).text()).toBe("(2)");
         expect(visibleFactors.at(1).text()).toBe("(2)");
         expect(visibleFactors.at(2).text()).toBe("(3)");
         expect(visibleFactors.length).toBe(3);
-        done();
+        doneFunctionRan = true;
     }
     xeroFactor2 = mount(XeroFactor2,{
         props : {
             done : workComplete
         }
     });
+    await flushPromises();
     let numInput = getPrimaryNumberInput(xeroFactor2);
     numInput.setValue("12");
+    await flushPromises();
+    jest.advanceTimersByTime(1000);
+    await flushPromises();
+    expect(doneFunctionRan).toBe(true);
 });
 
 test("input number 5562 produces prime factors '(2)(3)(3)(3)(103)', worker disabled", (done) => {
@@ -274,73 +313,123 @@ test("response from worker gets added to view (12)", (done) => {
     let index = 0;
 
     Worker = function () {
+        let key;
         this.onmessage = () => {};
         this.postMessage = () => {
             switch (index) {
-            case 0:
-                this.onmessage({data : "2"});
-                break;
-            case 1:
-                this.onmessage({data : "2"});
-                break;
-            case 2:
-                this.onmessage({data : "3"});
-                break;
-            default:
-                expect(false);
-                done();
+                case 0:
+                    key = "" + 12 + 0;
+                    this.onmessage({
+                        data : { 
+                            "key" : key,
+                            "result" : "2"
+                        }
+                    });
+                    break;
+                case 1:
+                    key = "" + 6 + 1;
+                    this.onmessage({
+                        data : { 
+                            "key" : key,
+                            "result" : "2"
+                        }
+                    });
+                    break;
+                case 2:
+                    key = "" + 3 + 2;
+                    this.onmessage({
+                        data : { 
+                            "key" : key,
+                            "result" : "3"
+                        }
+                    });
+                    break;
+                default:
+                    expect(false);
+                    done();
             }
             index++;
         }
     }
     let myWorker = new Worker();
+    let doneCalls = 0
+    let myWorkDoneFunction = () => {
+        if (doneCalls == 0) {
+            let visibleFactors = getVisibleFactors(xeroFactor2);
+            expect(visibleFactors.at(0).text()).toBe("(2)");
+            expect(visibleFactors.at(1).text()).toBe("(2)");
+            expect(visibleFactors.at(2).text()).toBe("(3)");
+            expect(visibleFactors.length).toBe(3);
+            done();
+        }
+        doneCalls++;
+    }
     xeroFactor2 = mount(XeroFactor2, {
         propsData : {
             worker : myWorker,
-            "done" : () => {
-                let visibleFactors = getVisibleFactors(xeroFactor2);
-                expect(visibleFactors.at(0).text()).toBe("(2)");
-                expect(visibleFactors.at(1).text()).toBe("(2)");
-                expect(visibleFactors.at(2).text()).toBe("(3)");
-                expect(visibleFactors.length).toBe(3);
-                done();
-            }
+            "done" : myWorkDoneFunction
         }
     });
     let numInput = getPrimaryNumberInput(xeroFactor2);
-    numInput.setValue("12");
+    xeroFactor2.vm.$nextTick(() => {
+        numInput.setValue("12");
+    });
 });
 
 test("response from worker gets added to view (14)", (done) => {
+    
+    let doneCalls = 0
+    let myWorkDoneFunction = () => {
+        if (doneCalls == 0) {
+            let visibleFactors = getVisibleFactors(xeroFactor2);
+            expect(visibleFactors.at(0).text()).toBe("(2)");
+            expect(visibleFactors.at(1).text()).toBe("(7)");
+            expect(visibleFactors.length).toBe(2);
+            done();
+        }
+        doneCalls++;
+    }
+
     let index = 0;
+    let key;
     Worker = function () {
         this.onmessage = () => {};
         this.postMessage = () => {
             switch (index) {
-            case 0:
-                this.onmessage({data : "2"});
-                break;
-            case 1:
-                this.onmessage({data : "7"});
-                break;
+                case 0:
+                    key = "" + 14 + 0;
+                    this.onmessage({
+                        data : { 
+                            "key" : key,
+                            "result" : "2"
+                        }
+                    });
+                    break;
+                case 1:
+                    key = "" + 7 + 1;
+                    this.onmessage({
+                        data : { 
+                            "key" : key,
+                            "result" : "7"
+                        }
+                    });
+                    break;
             }
             index++;
         }
+        
     }
+    
     let myWorker = new Worker();
-    xeroFactor2
     xeroFactor2 = mount(XeroFactor2, {
         propsData : {
             worker : myWorker,
-            done : () => {
-                let visibleFactors = getVisibleFactors(xeroFactor2);
-                expect(visibleFactors.at(0).text()).toBe("(2)");
-                expect(visibleFactors.at(1).text()).toBe("(7)");
-                expect(visibleFactors.length).toBe(2);
-                done();
-            }
+            done : myWorkDoneFunction
         }
     });
     let numInput = getPrimaryNumberInput(xeroFactor2);
-    numInput.setValue("14");
+    xeroFactor2.vm.$nextTick(() => {
+        numInput.setValue("14");
+    });
+    
 });

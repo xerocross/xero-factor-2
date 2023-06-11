@@ -3,7 +3,7 @@
         <div class="outer">
             <p class="intro">Enter a positive integer to find its prime factors.</p>
             <p>Computation happens <em>on your computer</em> so speed may vary. By 
-            definition 1 is not prime, so it is not accepted as input.</p>
+                definition 1 is not prime, so it is not accepted as input.</p>
             <div class = "alert alert-danger" role="alert" v-if="isError">
                 An error has occurred.
             </div>
@@ -54,6 +54,7 @@
 import Debounce from "lodash.debounce";
 import { Decimal } from "decimal.js";
 import factorize from "../factorizer.js";
+import q from "q";
 
 Decimal.set({ precision : 64 });
 
@@ -83,39 +84,61 @@ export default {
         return {
             integerInput : "2",
             factors : [],
+            observables : [],
             integer : new Decimal(2),
-            compositeNumbers : {},
             isWorking : false,
             invalidInput : false,
             isError : false,
             clearFactorize : () => {},
             factorIndex : 0,
-            workingString : ""
+            workingString : "",
+            workFinishedPromise : null,
+            workFinishedDefer : null,
+            history : [],
+            currentActivity : ""
         };
     },
     watch : {
         integerInput : Debounce(function (newValue, oldValue) {
-            console.log(`changed input: ${newValue}`);
+            this.pushHistory(`integerInput changed to: ${newValue} from ${oldValue}`);
+            console.debug(`changed input: ${newValue}`);
             let check = this.checkValidInput(newValue);
+            console.debug(`ran input validity check: ${check}`);
             if (check) {
                 this.integer = new Decimal(newValue);
                 this.clear();
-                this.factor();
+                this.factor()
+                    .then((val) => {
+                        this.pushHistory(`work completed with ${val}`);
+                        for (let str of this.history) {
+                            console.log(str);
+                        }
+                    })
+                    .fail((val) => {
+                        this.pushHistory(`work failed with ${val}`);
+                        for (let str of this.history) {
+                            console.log(str);
+                        }
+                    });
             }
+            this.invalidInput = !check;
+            if (!check)
+                console.log(`invalidInput: ${this.invalidInput}`);
         }, 100)
     },
     mounted () {
+        this.pushHistory(`component mounted`);
         this.animateWaiting();
         if (this.worker !== null) {
-            console.log("found web worker");
+            console.debug("found web worker");
             this.workerFound(true);
         } else {
             this.workerFound(false);
         }
-        this.factor();
     },
     methods : {
         checkValidInput (input) {
+            this.pushHistory(`checking validity of input: ${input}`);
             let test;
             if (input.length == 0) {
                 test = false;
@@ -127,8 +150,10 @@ export default {
             } else {
                 test = false;
             }
-            this.invalidInput = !test;
             return test;
+        },
+        async isInCompletedState () {
+            return await this.workFinishedPromise;
         },
         animateWaiting () {
             let div = this.$refs.working;
@@ -140,14 +165,36 @@ export default {
                 }, 500);
             }, 1000);
         },
+        halt () {
+            if (this.clearFactorize) {
+                this.clearFactorize();
+                this.clearFactorize = undefined;
+            }
+            for (let obs of this.observables) {
+                obs.cancel();
+            }
+            if (this.workFinishedDefer && !this.workFinishedDefer.promise.isFulfilled()) {
+                this.workFinishedDefer.reject("halt");
+            }
+            this.pushHistory(`work halted`);
+        },
         clear () {
             this.factors = [];
             this.isError = false;
-            this.clearFactorize();
-            this.clearFactorize = undefined;
+            this.halt();
+            console.debug("cleared");
+            console.trace();
+            this.workFinishedPromise = null;
+            this.workFinishedDefer = null;
+            this.pushHistory(`work cleared`);
         },
         logState () {
-            function getFactorString () {
+            console.debug(
+                this.getStateString()
+            );
+        },
+        getStateString () {
+            const getFactorString = () => {
                 let factorString = "";
                 for (let factor of this.factors) {
                     factorString = `${factorString}(${factor.string})`;
@@ -155,16 +202,25 @@ export default {
                 return factorString;
             }
             let factorString = getFactorString();
-            console.log(`input was ${this.integerInput}; factors: ${factorString};`);
+            return `XeroFactor2 State:
+                input: ${this.integerInput}; 
+                factors: ${factorString};
+                num observables: ${this.observables.length};
+                factors: ${factorString};
+                isWorking: ${this.isWorking};
+                isError: ${this.isError};
+                currentActivity: ${this.currentActivity};
+                `;
         },
         pushFactor (val) {
-            console.log(`found factor: ${val}`);
+            console.debug(`found factor: ${val}`);
             let floor = val.floor();
             if (!val.equals(floor)) {
                 this.logState();
                 this.isError = true;
                 throw new Error(`attempted to push non-integer factor ${val}`)
             }
+            this.pushHistory(`pushing new factor ${val} for integer ${this.integer}.`);
             this.factors.push({
                 value : val,
                 string : val.toString(),
@@ -172,8 +228,38 @@ export default {
             });
             this.factorIndex++;
         },
-        factor () {
+        pushHistory (currentActivity) {
+            this.currentActivity = currentActivity;
+            this.history.push(this.getStateString());
+        },
+        showWorkingImage () {
+            switch(this.workingString) {
+                case "":
+                    this.workingString = "|";
+                    break;
+                case "|":
+                    this.workingString = "/";
+                    break;
+                case "/":
+                    this.workingString = "-";
+                    break;
+                case "-":
+                    this.workingString = "\\";
+                    break;
+                case "\\":
+                    this.workingString = "|";
+                    break;
+                default:
+                    this.workingString = "-";
+                    break;
+            }
+        },
+        async factor () {
+            this.pushHistory(`Started factoring ${this.integer}.`);
             this.beginningWork();
+            this.workFinishedDefer = q.defer();
+            this.workFinishedPromise = this.workFinishedDefer.promise;
+            console.debug("factoring");
             this.$emit("BeginWorking");
             this.isWorking = true;
             const getProduct = () => {
@@ -183,62 +269,54 @@ export default {
                 }
                 return product;
             }
-            const obj = factorize(this.integer, this.worker, this);
-            const { observable, clear } = obj;
+            const { observable, clear } = factorize(this.integer, this.worker, this);
             this.clearFactorize = clear;
+
             observable.subscribe((event) => {
                 let product;
                 const status = event.status;
                 switch (status) {
                     case "working":
-                        switch(this.workingString) {
-                            case "":
-                                this.workingString = "|";
-                                break;
-                            case "|":
-                                this.workingString = "/";
-                                break;
-                            case "/":
-                                this.workingString = "-";
-                                break;
-                            case "-":
-                                this.workingString = "\\";
-                                break;
-                            case "\\":
-                                this.workingString = "|";
-                                break;
-                            default:
-                                this.workingString = "-";
-                                break;
-                        }
+                        this.showWorkingImage();
                         break;
                     case "factor":
+                        this.pushHistory(`observable sent message factor: ${event.payload.factor}`);
                         this.pushFactor(event.payload.factor);
                         break;
                     case "error":
                         this.isError = true;
-                        console.log(`an unexpected error occurred: ${event.payload.error.message}`);
-                        console.log(event.payload.error);
-                        break;
+                        this.pushHistory(`finding next factor encountered an error`);
+                        console.error(`an unexpected error occurred: ${event.payload.error.message}`);
+                        console.trace();
+                        console.error(event.payload.error);
+                        this.workFinishedDefer.reject("observable sent an error");
+                        throw event.payload.error;
                     case "success":
+                        this.pushHistory(`factoring observable sent message: success`);
                         this.isWorking = false;
+                        this.workFinishedDefer.resolve("success");
                         this.done();
+                        console.debug("just called done function");
                         this.$emit("WorkComplete");
                         product = getProduct();
                         let test = (this.integer.equals(product));
                         if (test) {
-                            console.log("passed product test");
+                            console.debug("passed product test");
                         } else {
-                            console.log(`failed product test, product = ${product}`);
+                            console.debug(`failed product test, product = ${product}`);
                             this.isError = true;
                         }
                         break;
                     default:
-                        console.log("An unknown error occurred");
+                        console.error("An unknown error occurred");
+                        console.trace();
+                        this.pushHistory(`observable sent an unexpected message`);
                         this.isError = true;
                         break;
                 }   
             });
+            this.observables.push(observable);
+            return this.workFinishedDefer.promise;
         }
     }
 };

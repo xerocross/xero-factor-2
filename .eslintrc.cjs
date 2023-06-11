@@ -1,15 +1,15 @@
 /* eslint-env node */
-require('@rushstack/eslint-patch/modern-module-resolution')
+require("@rushstack/eslint-patch/modern-module-resolution")
 
 module.exports = {
     root : true,
-    'extends' : [
-        'plugin:vue/vue3-essential',
-        'eslint:recommended',
-        '@vue/eslint-config-prettier/skip-formatting'
+    "extends" : [
+        "plugin:vue/vue3-essential",
+        "eslint:recommended",
+        "@vue/eslint-config-prettier/skip-formatting"
     ],
     parserOptions : {
-        ecmaVersion : 'latest'
+        ecmaVersion : "latest"
     },
     rules : {
         "vue/prop-name-casing" : 1,
@@ -30,7 +30,9 @@ module.exports = {
         "vue/html-self-closing" : [0],
         "space-before-function-paren" : ["error", "always"],
         "arrow-spacing" : ["error", { before : true, after : true }],
-        "no-case-declarations" : false
+        "no-case-declarations" : 0,
+        "no-prototype-builtins" : 0,
+        quotes : ["error", "double", { "allowTemplateLiterals" : true }]
     },
     globals : {
         "env" : false,
@@ -38,6 +40,7 @@ module.exports = {
         "beforeEach" : false,
         "test" : false,
         "expect" : false,
-        "afterEach" : false
+        "afterEach" : false,
+        "jest" : false
     }
 }
