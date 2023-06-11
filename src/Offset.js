@@ -8,13 +8,13 @@ const offset = (inputCodeBlockFunction) => {
             const res = inputCodeBlockFunction();
             defer.resolve(res);
         } catch (e) {
-            defer.fail(e);
+            defer.reject(e);
         }
     },0);
 
     const cancel = () => {
         if (!defer.promise.isFulfilled()) {
-            defer.fail();
+            defer.reject();
         }
         clearTimeout(id);
     }

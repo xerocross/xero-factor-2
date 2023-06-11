@@ -11,7 +11,7 @@ const factorize = function () {
     let deferreds;
     let deferredKeys;
     let offsetObjects = [];
-    let vueComponent;
+    let waitFunction;
 
     // will be exported
     function clear () {
@@ -120,7 +120,7 @@ const factorize = function () {
                         // unless the overall goal of finding
                         // the next factor has been resolved.
                         if (!foundFactorDeferred.promise.isFulfilled()) {
-                            executeInterval(nextIndex);
+                            return executeInterval(nextIndex);
                         } else {
                             console.debug("terminated search for factor before checking all intervals");
                         }
@@ -139,6 +139,7 @@ const factorize = function () {
                     foundFactorDeferred.fail(new Error("An unexpected error has occurred"));
                 }
             }
+            return intervalDeferred.promise;
         }
         
         if (true || worker == undefined || worker == null) {
@@ -182,10 +183,6 @@ const factorize = function () {
         return foundFactorDeferred.promise;
     }
 
-
-
-
-
     function factorRecursion (integer, factors, quotient, observer, deferred) {
         const one = new Decimal(1);
         // base case stops the recursion
@@ -207,16 +204,13 @@ const factorize = function () {
                     // I want the window painted before
                     // we move on to the next computation
                     try {
-                        vueComponent.$nextTick(() => {
-                            window.requestAnimationFrame(() => {
-                                factorRecursion(integer, factors, newQuotient, observer, deferred);
-                            });
+                        waitFunction(() => {
+                            factorRecursion(integer, factors, newQuotient, observer, deferred);
                         });
                     } catch (e) {
                         console.debug("was not able to use $nextTick and requestAnimationFrame");
                         factorRecursion(integer, factors, newQuotient, observer, deferred);
                     }
-
                 })
                 .fail((e) => {
                     if (e === "halt") {
@@ -236,25 +230,28 @@ const factorize = function () {
     }
 
     // integer is a Decimal
-    const factor = function (integer, workerIn, vueComponentIn) {
+    const factor = function (integer, workerIn, waitFunction, subscriber) {
+        const factorDefer = q.defer();
+        deferredKeys = [];
+        deferreds = {};
+        let key = "main" + integer
+        deferredKeys.push(key);
+        deferreds[key] = factorDefer;
         worker = workerIn;
-        vueComponent = vueComponentIn;
         factorIndex = 0;
         const factors = [];
         timeoutQueue = [];
-        deferreds = {};
-        deferredKeys = [];
-        const defer = q.defer();
+        
+        
+        const recursionDefer = q.defer();
         const observable = new Observable((observer) => {
-            factorRecursion(integer, factors, integer, observer, defer)
+            factorRecursion(integer, factors, integer, observer, recursionDefer)
                 .then(() => {
-                    observer.next({
-                        status : "success"
-                    });
+                    factorDefer.resolve("success");
                 })
                 .fail((e) => {
                     if (e === "halt") {
-                        console.debug("halted");
+                        factorDefer.reject("halt");
                     } else {
                         observer.next({
                             status : "error",
@@ -262,10 +259,14 @@ const factorize = function () {
                                 error : e
                             }
                         });
+                        factorDefer.reject("error");
                     }
                 });
         });
-        return { observable : observable, clear : clear }
+        subscriber.observable = observable;
+        Object.assign(subscriber, { observable, clear});
+
+        return factorDefer.promise;
     }
     return factor;
 }

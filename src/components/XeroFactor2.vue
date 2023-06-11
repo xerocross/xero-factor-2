@@ -54,7 +54,6 @@
 import Debounce from "lodash.debounce";
 import { Decimal } from "decimal.js";
 import factorize from "../factorizer.js";
-import q from "q";
 
 Decimal.set({ precision : 64 });
 
@@ -92,8 +91,6 @@ export default {
             clearFactorize : () => {},
             factorIndex : 0,
             workingString : "",
-            workFinishedPromise : null,
-            workFinishedDefer : null,
             history : [],
             currentActivity : ""
         };
@@ -109,13 +106,24 @@ export default {
                 this.clear();
                 this.factor()
                     .then((val) => {
+                        this.isWorking = false;
+                        this.done();
+                        console.debug("just called done function");
+                        this.$emit("WorkComplete");
                         this.pushHistory(`work completed with ${val}`);
                         for (let str of this.history) {
                             console.log(str);
                         }
+                        if (this.checkProduct()) {
+                            console.debug("passed product test");
+                        } else {
+                            console.error(`failed product test`);
+                            this.isError = true;
+                        }
                     })
                     .fail((val) => {
                         this.pushHistory(`work failed with ${val}`);
+                        this.done();
                         for (let str of this.history) {
                             console.log(str);
                         }
@@ -152,9 +160,6 @@ export default {
             }
             return test;
         },
-        async isInCompletedState () {
-            return await this.workFinishedPromise;
-        },
         animateWaiting () {
             let div = this.$refs.working;
             window.x = this;
@@ -173,9 +178,6 @@ export default {
             for (let obs of this.observables) {
                 obs.cancel();
             }
-            if (this.workFinishedDefer && !this.workFinishedDefer.promise.isFulfilled()) {
-                this.workFinishedDefer.reject("halt");
-            }
             this.pushHistory(`work halted`);
         },
         clear () {
@@ -183,9 +185,6 @@ export default {
             this.isError = false;
             this.halt();
             console.debug("cleared");
-            console.trace();
-            this.workFinishedPromise = null;
-            this.workFinishedDefer = null;
             this.pushHistory(`work cleared`);
         },
         logState () {
@@ -254,26 +253,31 @@ export default {
                     break;
             }
         },
-        async factor () {
+        checkProduct () {
+            let product = new Decimal(1);
+            for (let i of this.factors) {
+                product = product.times(i.value);
+            }
+            return (product.equals(this.integer));
+        },
+        factor () {
             this.pushHistory(`Started factoring ${this.integer}.`);
             this.beginningWork();
-            this.workFinishedDefer = q.defer();
-            this.workFinishedPromise = this.workFinishedDefer.promise;
             console.debug("factoring");
             this.$emit("BeginWorking");
             this.isWorking = true;
-            const getProduct = () => {
-                let product = new Decimal(1);
-                for (let i of this.factors) {
-                    product = product.times(i.value);
-                }
-                return product;
+            const subscriber = {};
+            let waitFunction = (infun) => {
+                this.$nextTick(() => {
+                    window.requestAnimationFrame(() => {
+                        infun();
+                    });
+                });
             }
-            const { observable, clear } = factorize(this.integer, this.worker, this);
-            this.clearFactorize = clear;
+            const factorPromise = factorize(this.integer, this.worker, waitFunction, subscriber);
+            this.clearFactorize = subscriber.clear;
 
-            observable.subscribe((event) => {
-                let product;
+            subscriber.observable.subscribe((event) => {
                 const status = event.status;
                 switch (status) {
                     case "working":
@@ -293,19 +297,6 @@ export default {
                         throw event.payload.error;
                     case "success":
                         this.pushHistory(`factoring observable sent message: success`);
-                        this.isWorking = false;
-                        this.workFinishedDefer.resolve("success");
-                        this.done();
-                        console.debug("just called done function");
-                        this.$emit("WorkComplete");
-                        product = getProduct();
-                        let test = (this.integer.equals(product));
-                        if (test) {
-                            console.debug("passed product test");
-                        } else {
-                            console.debug(`failed product test, product = ${product}`);
-                            this.isError = true;
-                        }
                         break;
                     default:
                         console.error("An unknown error occurred");
@@ -315,8 +306,8 @@ export default {
                         break;
                 }   
             });
-            this.observables.push(observable);
-            return this.workFinishedDefer.promise;
+            this.observables.push(subscriber.observable);
+            return factorPromise;
         }
     }
 };
