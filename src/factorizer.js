@@ -176,7 +176,7 @@ const factorize = function () {
             // will have been broken up inter intervals, and
             // this chunk of synchronous code will only handle
             // the index'th interval 
-            if (true || worker == undefined || worker == null) {
+            if (worker == undefined || worker == null) {
                 // worker is not available
                 
                 // For work in a browser without web worker
