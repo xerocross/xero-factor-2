@@ -9,7 +9,7 @@ function getPrimaryNumberInput (xeroFactor2) {
 }
 
 function getFactorListOuter (xeroFactor2) {
-    return xeroFactor2.find(".factors-list")
+    return xeroFactor2.find(".factors-list");
 }
 
 function getVisibleFactors (xeroFactor2) {
@@ -24,8 +24,8 @@ beforeEach(() => {
     
     Worker = () => {
         throw new Error("worker not defined");
-    }
-})
+    };
+});
 
 afterEach(() => {
     // Clean up the mounted component after each test
@@ -104,7 +104,7 @@ test("during working, shows '(working)' message",  async () => {
         functionRan = true;
         xeroFactor2.vm.logState();
         xeroFactor2.vm.clear();
-    }
+    };
     await xeroFactor2.vm.$nextTick();
     let numInput = getPrimaryNumberInput(xeroFactor2);
     numInput.setValue("12");
@@ -116,7 +116,7 @@ test("during working, shows '(working)' message",  async () => {
 });
 
 test("input number 3 produces prime factors '(3)', worker disabled", async () => {
-    jest.useFakeTimers()
+    jest.useFakeTimers();
     window.Worker = null;
     let functionRan = false;
     let workComplete = async () => {
@@ -125,7 +125,7 @@ test("input number 3 produces prime factors '(3)', worker disabled", async () =>
         let visibleFactors = getVisibleFactors(xeroFactor2);
         expect(visibleFactors.at(0).text()).toBe("(3)");
         expect(visibleFactors.length).toBe(1);
-    }
+    };
     xeroFactor2 = mount(XeroFactor2, {
         props : {
             done : workComplete
@@ -141,7 +141,7 @@ test("input number 3 produces prime factors '(3)', worker disabled", async () =>
 });
 
 test.only("input number 12 produces prime factors '(2)(2)(3)', worker disabled", async () => {
-    jest.useFakeTimers()
+    jest.useFakeTimers();
     window.Worker = null;
     let doneFunctionRan = false;
     let workComplete = () => {
@@ -151,7 +151,7 @@ test.only("input number 12 produces prime factors '(2)(2)(3)', worker disabled",
         expect(visibleFactors.at(2).text()).toBe("(3)");
         expect(visibleFactors.length).toBe(3);
         doneFunctionRan = true;
-    }
+    };
     xeroFactor2 = mount(XeroFactor2,{
         props : {
             done : workComplete
@@ -177,7 +177,7 @@ test("input number 5562 produces prime factors '(2)(3)(3)(3)(103)', worker disab
         expect(visibleFactors.at(4).text()).toBe("(103)");
         expect(visibleFactors.length).toBe(5);
         done();
-    }
+    };
     xeroFactor2 = mount(XeroFactor2,{
         props : {
             done : workComplete
@@ -197,7 +197,7 @@ test("input number 2923675 produces prime factors '(5) (5) (83) (1409)', worker 
         expect(visibleFactors.at(3).text()).toBe("(1409)");
         expect(visibleFactors.length).toBe(4);
         done();
-    }
+    };
     xeroFactor2 = mount(XeroFactor2,{
         props : {
             done : workComplete
@@ -221,7 +221,7 @@ test("input number 29236752 produces prime factors '(2) (2) (2) (2) (3) (3) (191
         expect(visibleFactors.at(7).text()).toBe("(1063)");
         expect(visibleFactors.length).toBe(8);
         done();
-    }
+    };
     xeroFactor2 = mount(XeroFactor2,{
         props : {
             done : workComplete
@@ -239,7 +239,7 @@ test("input number 35567588767879 produces prime factors '(7) (5081084109697)', 
         expect(visibleFactors.at(1).text()).toBe("(5081084109697)");
         expect(visibleFactors.length).toBe(2);
         done();
-    }
+    };
     xeroFactor2 = mount(XeroFactor2,{
         props : {
             done : workComplete
@@ -257,7 +257,7 @@ test("input number 287789543 produces prime factors '(287789543)', worker disabl
         expect(visibleFactors.at(0).text()).toBe("(287789543)");
         expect(visibleFactors.length).toBe(1);
         done();
-    }
+    };
     xeroFactor2 = mount(XeroFactor2,{
         props : {
             done : workComplete
@@ -271,8 +271,8 @@ test("mount with worker calls workerFound(true)", (done) => {
     Worker = function () {
         this.onmessage = () => {};
         this.postMessage = () => {
-        }
-    }
+        };
+    };
     xeroFactor2 = mount(XeroFactor2, {
         propsData : {
             worker : new Worker(),
@@ -349,10 +349,10 @@ test("response from worker gets added to view (12)", (done) => {
                     done();
             }
             index++;
-        }
-    }
+        };
+    };
     let myWorker = new Worker();
-    let doneCalls = 0
+    let doneCalls = 0;
     let myWorkDoneFunction = () => {
         if (doneCalls == 0) {
             let visibleFactors = getVisibleFactors(xeroFactor2);
@@ -363,7 +363,7 @@ test("response from worker gets added to view (12)", (done) => {
             done();
         }
         doneCalls++;
-    }
+    };
     xeroFactor2 = mount(XeroFactor2, {
         propsData : {
             worker : myWorker,
@@ -378,7 +378,7 @@ test("response from worker gets added to view (12)", (done) => {
 
 test("response from worker gets added to view (14)", (done) => {
     
-    let doneCalls = 0
+    let doneCalls = 0;
     let myWorkDoneFunction = () => {
         if (doneCalls == 0) {
             let visibleFactors = getVisibleFactors(xeroFactor2);
@@ -388,7 +388,7 @@ test("response from worker gets added to view (14)", (done) => {
             done();
         }
         doneCalls++;
-    }
+    };
 
     let index = 0;
     let key;
@@ -416,9 +416,9 @@ test("response from worker gets added to view (14)", (done) => {
                     break;
             }
             index++;
-        }
+        };
         
-    }
+    };
     
     let myWorker = new Worker();
     xeroFactor2 = mount(XeroFactor2, {

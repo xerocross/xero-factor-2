@@ -32,7 +32,8 @@ module.exports = {
         "arrow-spacing" : ["error", { before : true, after : true }],
         "no-case-declarations" : 0,
         "no-prototype-builtins" : 0,
-        quotes : ["error", "double", { "allowTemplateLiterals" : true }]
+        quotes : ["error", "double", { "allowTemplateLiterals" : true }],
+        "semi" : ["error", "always"]
     },
     globals : {
         "env" : false,

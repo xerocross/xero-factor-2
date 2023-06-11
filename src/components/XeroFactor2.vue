@@ -121,7 +121,7 @@ export default {
                             this.isError = true;
                         }
                     })
-                    .fail((val) => {
+                    .catch((val) => {
                         this.pushHistory(`work failed with ${val}`);
                         this.done();
                         for (let str of this.history) {
@@ -199,7 +199,7 @@ export default {
                     factorString = `${factorString}(${factor.string})`;
                 }
                 return factorString;
-            }
+            };
             let factorString = getFactorString();
             return `XeroFactor2 State:
                 input: ${this.integerInput}; 
@@ -217,7 +217,7 @@ export default {
             if (!val.equals(floor)) {
                 this.logState();
                 this.isError = true;
-                throw new Error(`attempted to push non-integer factor ${val}`)
+                throw new Error(`attempted to push non-integer factor ${val}`);
             }
             this.pushHistory(`pushing new factor ${val} for integer ${this.integer}.`);
             this.factors.push({
@@ -273,7 +273,7 @@ export default {
                         infun();
                     });
                 });
-            }
+            };
             const factorPromise = factorize(this.integer, this.worker, waitFunction, subscriber);
             this.clearFactorize = subscriber.clear;
 
