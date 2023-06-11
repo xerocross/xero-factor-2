@@ -140,7 +140,7 @@ test("input number 3 produces prime factors '(3)', worker disabled", async () =>
     expect(functionRan).toBe(true);
 });
 
-test.only("input number 12 produces prime factors '(2)(2)(3)', worker disabled", async () => {
+test("input number 12 produces prime factors '(2)(2)(3)', worker disabled", async () => {
     jest.useFakeTimers();
     window.Worker = null;
     let doneFunctionRan = false;
