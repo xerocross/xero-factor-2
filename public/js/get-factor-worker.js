@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 importScripts("decimal.js");
 self.addEventListener("message", function (event) {
     // Access the data sent from the main thread
@@ -11,12 +12,11 @@ self.addEventListener("message", function (event) {
 });
 
 function doComputation (data) {
-    // eslint-disable-next-line no-undef
     let int = new Decimal(data);
     let squareRoot = int.squareRoot();
-    // eslint-disable-next-line no-undef
+    let max = squareRoot.ceil().plus(new Decimal(1));
     let i = new Decimal(2);
-    while (i.lessThan(squareRoot)) {
+    while (i.lessThan(max)) {
         let test = int.modulo(i).equals(0);
         if (test) {
             return i.toString();
