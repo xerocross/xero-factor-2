@@ -2,6 +2,9 @@
 // form (observer) => {here define and start
 // the activities of this observer upon
 // subscribing }
+// this is a constructor; should be
+// called with new to create new Obsesrvable
+// object
 function Observable (subscribeFunction) {
     let subscriberUpdateFunction = function () {};
     const observer = {
