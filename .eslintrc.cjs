@@ -3,10 +3,14 @@ require("@rushstack/eslint-patch/modern-module-resolution")
 
 module.exports = {
     root : true,
+    "plugins" : [
+        "jest"
+    ],
     "extends" : [
         "plugin:vue/vue3-essential",
         "eslint:recommended",
-        "@vue/eslint-config-prettier/skip-formatting"
+        "@vue/eslint-config-prettier/skip-formatting",
+        "plugin:jest/recommended"
     ],
     parserOptions : {
         ecmaVersion : "latest"
@@ -32,16 +36,14 @@ module.exports = {
         "arrow-spacing" : ["error", { before : true, after : true }],
         "no-case-declarations" : 0,
         "no-prototype-builtins" : 0,
-        quotes : ["error", "double", { "allowTemplateLiterals" : true }],
-        "semi" : ["error", "always"]
+        "quotes" : ["error", "double", { "allowTemplateLiterals" : true }],
+        "semi" : ["error", "always"],
+        "jest/no-done-callback" : "off",
+        "jest/no-conditional-expect" : "off"
     },
     globals : {
         "env" : false,
         "importScripts" : false,
-        "beforeEach" : false,
-        "test" : false,
-        "expect" : false,
-        "afterEach" : false,
         "jest" : false
     }
-}
+};
