@@ -1,23 +1,37 @@
 import { Observable } from "./Observable.js";
 import { Decimal } from "decimal.js";
 import offset from "./Offset.js";
+import WeAssert from "we-assert";
+import isPrime from "./PrimeChecker.js";
+import { v4 as uuidv4 } from "uuid";
 
 const factorize = function () {
     Decimal.set({ precision : 64 });
+    let id = uuidv4().substring(0,8);
     let worker;
     let factorIndex;
     let offsetSubscribers = [];
     let waitFunction;
     let cancelFunctions = [];
+    let lastFactor;
+    const we = WeAssert.build();
+    let globalHalt = false;
+    we.setLevel("ERROR");
+    we.setHandler((message) => {
+        throw new Error(`${id}: The following assertion failed: ${message}`);
+    });
 
     // will be exported
     function clear () {
+        globalHalt = true;
+        console.debug(`${id}: clearing`);
         for (let subscriber of offsetSubscribers) {
             subscriber.cancel();
         }
         for (let fun of cancelFunctions) {
             fun("halt");
         }
+        lastFactor = undefined;
     }
 
     // getNextFactor breaks up the work of finding
@@ -27,19 +41,12 @@ const factorize = function () {
     // The point of this is to allow for greater responsivenss
     // in the browser even for computations with large numbers.
     function getNextFactor (integer, quotient, observer) {
+        console.debug(`${id}: finding next factor of ${quotient}`);
+        we.assert.atLevel("ERROR").that("quotient is an integer", quotient.floor().equals(quotient));
         let isFactorResolved = false;
         return new Promise((nextFactorResolve, nextFactorReject) => {
-            let key = "" + quotient.toString() + factorIndex;
-            cancelFunctions.push(nextFactorReject);
+            let key = "" + id + integer.toString() + factorIndex;
             let lastCheckedNumber;
-            let numbersCheckedInSequence = (i) => {
-                if (lastCheckedNumber) {
-                    if (!i.equals(lastCheckedNumber.plus(new Decimal(1)))) {
-                        throw new Error(`exception: didn't check between ${lastCheckedNumber} and ${i}`);
-                    }
-                }
-                lastCheckedNumber = i;
-            };
             // keep track of the reject functions
             // so we can halt promises abruptly
             // if user input changes--to avoid 
@@ -47,135 +54,136 @@ const factorize = function () {
             cancelFunctions.push(nextFactorReject);
             
             let computeIntervalDetails = (index, quotient) => {
-                let max = quotient.squareRoot().ceil().plus(1);
+                let globalMax = quotient.squareRoot().ceil().plus(1);
                 // plus 1 accounts for numbers that are perfect squares
-                let intervalLength = max.div(new Decimal(100)).floor();
+                // set an intervalLength that is meaningful
+                // to the size of the input
+                let intervalLength = globalMax.div(new Decimal(100)).floor();
                 // the following ternary logic is to handle the case
                 // where quotient is a relatively small number
                 intervalLength = intervalLength.equals(new Decimal(0)) ? new Decimal(1000) : intervalLength;
                 let firstEltOfInterval = index.times(intervalLength);
                 // exclude 1 explicitly because the smallest
                 // prime is 2
-                let start = Decimal.max(firstEltOfInterval, new Decimal(2)); 
-                let localMax = Decimal.min(index.plus(1).times(intervalLength), max);
-                
-                // set an intervalLength that is meaningful
-                // to the size of the input
-                
-                let numIntervals = max.div(intervalLength).ceil();
+                let start = Decimal.max(firstEltOfInterval, new Decimal(2));
+                we.assert.atLevel("ERROR").that("start >= 2", start.greaterThanOrEqualTo(new Decimal(2)));
+                let intervalMax = Decimal.min(index.plus(1).times(intervalLength), globalMax);
+                let numIntervals = globalMax.div(intervalLength).ceil();
                 return {
-                    start, localMax, firstEltOfInterval, max, intervalLength, numIntervals
+                    start, intervalMax, firstEltOfInterval, globalMax, intervalLength, numIntervals
                 };
             };
+
             function executeInterval (index) {
-                // indicate to subscriber that a meaningful
-                // tick of work is starting
                 let intervalDetails = computeIntervalDetails(index, quotient);
                 let i = intervalDetails.start;
-                const intervalDone = new Promise((intervalResolve, intervalReject) => {
+                console.debug(`starting interval ${index}; start: ${i}; globalMax : ${intervalDetails.globalMax}`);
+                if (i.greaterThanOrEqualTo(intervalDetails.globalMax)) {
+                    // terminate
+                    console.log(`terminating interval: ${index}; will return ${quotient}`);
+                    we.assert.atLevel("DEBUG").that("quotient is prime", isPrime(quotient));
+                    return Promise.resolve(quotient);
+                }
+                return new Promise((intervalResolve, intervalReject) => {
                     cancelFunctions.push(intervalReject);
+                    // indicate to subscriber that a meaningful
+                    // tick of work is starting
                     observer.next({
                         status : "working"
                     });
-                    
-                    console.debug(`start: ${intervalDetails.start}; localMax: ${intervalDetails.localMax}; intervalLength: ${intervalDetails.intervalLength}; integer: ${integer}`);
                     if (index.lessThan(intervalDetails.numIntervals)) {
+                        console.debug(`${id} checking: start: ${intervalDetails.start}; intervalMax: ${intervalDetails.intervalMax}; intervalLength: ${intervalDetails.intervalLength}; integer: ${integer}`);
                         // check all numbers in the interval
                         // until either we find a factor
                         // or we reach the global max
                         const subscriber = {};
                         const offsetObject = offset(() => {
                             // begin main asynchronous computation function
-                            if (i.greaterThanOrEqualTo(intervalDetails.max)) {
+                            if (i.greaterThanOrEqualTo(intervalDetails.globalMax)) {
                                 // this indicates that quotient itself is
                                 // the only remaining factor
-                                nextFactorResolve(quotient);
+                                intervalResolve(quotient);
                                 return;
                             }
                             // find smallest i that divides quotient
-                            while (i.lessThan(intervalDetails.localMax)) {
-                                // sanity check
-                                if (i.equals(new Decimal(1))) {
-                                    throw new Error("i was 1");
-                                }
+                            while (i.lessThan(intervalDetails.intervalMax)) {
+                                we.assert.atLevel("ERROR").that(`i:${i} > 1`, i.greaterThan(new Decimal(1)));
                                 // the following is a sanity check
                                 // to avoid silent errors
-                                numbersCheckedInSequence(i);
+                                // we want to make sure we didn't skip any
+                                // numbers between 2 and globalMax
+                                we.assert.atLevel("ERROR").that("i = 2 or i = lastCheckedNumber + 1", i.equals(new Decimal(2)) || i.equals(lastCheckedNumber.plus(new Decimal(1))));
+                                we.assert.atLevel("ERROR").that("lastCheckedNumber does not divide quotient", lastCheckedNumber ? !quotient.modulo(lastCheckedNumber).equals(0): true);
 
                                 let divides = quotient.modulo(i).equals(0);
                                 if (divides) {
+                                    // since we checked each number from 2 to globalMax
+                                    // in order, if we reach this line it proves
+                                    // that i is the smallest number between 2 and globalMax
+                                    // that divides quotient
+
                                     // resolve the deferred at the
                                     // getNextFactor level
                                     // bfoundFactorDeferred.resolve(i);
-                                    nextFactorResolve(i);
+                                    console.log(`${id}: found that ${i} divides ${quotient}; resolving`);
+                                    //nextFactorResolve(i);
+                                    intervalResolve(i);
                                     isFactorResolved = true;
                                     // exit the executeInterval function
                                     return;
                                 }
+                                lastCheckedNumber = i;
                                 i = i.add(1);
                             }
                             // end main asynchronous computation function
                         }, subscriber);
-                        // store offsetObject
                         offsetSubscribers.push(subscriber);
                         offsetObject
                             .then(() => {
-                                intervalResolve(true);
+                                const nextIndex = index.plus(new Decimal(1));
+                                console.log(`${id} finished testing interval index: ${index};`);
+                                // computation for the next interval
+                                // is called asynchronously whenever
+                                // computation for the previous interval
+                                // has completed.
+        
+                                // unless the overall goal of finding
+                                // the next factor has been resolved.
+                                if (!isFactorResolved) {
+                                    console.log(`recursing down into index: ${nextIndex}`);
+                                    intervalResolve(executeInterval(nextIndex));
+                                } else {
+                                    console.debug(`${id} factor found before checking all intervals: not recursing down to index ${nextIndex}`);
+                                }
                             })
                             .catch((e) => {
                                 intervalReject(e);
                             });
-
                     } else { 
                         // there are no more intervals
                         // all intervals have been processed until
-                        // the index i has reached at least max
+                        // the index i has reached at least globalMax
 
-                        // here the condition i.greaterThanOrEqualTo(intervalDetails.max)
+                        // here the condition i.greaterThanOrEqualTo(intervalDetails.globalMax)
                         // should always be true. We put a check on this
                         // as a sanity check to avoid potential silent
                         // errors.
-                        if (i.greaterThanOrEqualTo(intervalDetails.max)) {
-                            nextFactorResolve(quotient);
+                        
+                        if (we.assert.atLevel("ERROR").that("i >= globalMax", i.greaterThanOrEqualTo(intervalDetails.globalMax))) {
+                            // If we reach this line it means that no number
+                            // from 2 up to sqrt(quotient)+1 divides the quotient, so
+                            // quotient is prime. In other words, the smallest next
+                            // factor of quotient is quotient.
+                            we.assert.atLevel("DEBUG").that("quotient is prime", isPrime(quotient));
+                            console.debug(`${id}: resolved next factor: ${quotient}`);
+                            //nextFactorResolve(quotient);
+                            intervalResolve(quotient);
                             isFactorResolved = true;
-                        } else {
-                            nextFactorReject(new Error("An logical error has occurred"));
-                            throw new Error("logical error");
                         }
                     }
                 });
-
-                if (i.greaterThanOrEqualTo(intervalDetails.max)) {
-                    nextFactorResolve(quotient);
-                } else {
-                    // recurse down using next index
-                    const nextIndex = index.plus(new Decimal(1));
-                    intervalDone
-                        .then(() => {
-                            // computation for the next interval
-                            // is called asynchronously whenever
-                            // computation for the previous interval
-                            // has completed.
-
-                            // unless the overall goal of finding
-                            // the next factor has been resolved.
-                            if (!isFactorResolved) {
-                                return executeInterval(nextIndex);
-                            } else {
-                                console.debug("search successful before checking all intervals");
-                            }
-                        })
-                        .catch((e) => {
-                            console.debug("An unexpected event has occurred: halting");
-                            nextFactorReject(e);
-                        });
-                }
-                return intervalDone;
             }
-            // by the time this function is called, the work
-            // will have been broken up inter intervals, and
-            // this chunk of synchronous code will only handle
-            // the index'th interval 
+                
             if (worker == undefined || worker == null) {
                 // worker is not available
                 
@@ -195,86 +203,80 @@ const factorize = function () {
                 // we use them
                 
                 let intervalIndex = new Decimal(0);
-                executeInterval(intervalIndex);
+                executeInterval(intervalIndex)
+                    .then((newFactor) => {
+                        console.debug(`${id} exucuting all intervals finished; factor: ${newFactor}.`);
+                        nextFactorResolve(newFactor);
+                    })
+                    .catch((e) => {
+                        console.error(`${id} encountered error while executing intervals`);
+                        throw e;
+                    });
             } else {
-                console.debug("using worker");
+                console.debug(`${id} using worker`);
                 worker.onmessage = function (e) {
-                    if (e.data.key == key) {
-                        console.debug(`worker sent message: integer : ${e.data.result}; key : ${e.data.key}`);
-                        nextFactorResolve(new Decimal(e.data.result));
+                    if (e.data.status == "factor" && e.data.key == key) {
+                        console.debug(`${id} worker sent message: next factor : ${e.data.payload.factor}; key : ${e.data.key}`);
+                        nextFactorResolve(new Decimal(e.data.payload.factor));
+                    }
+                    if (e.data.status === "received halt request") {
+                        console.debug(`worker received halt request on integer ${e.data.payload.integer.toString()}`);
+                    }
+                    if (e.data.status === "halted") {
+                        console.debug(`worker halted on ${e.data.payload.integer.toString()}`);
+                    }
+                    if (e.data.status === "error") {
+                        console.debug(`worker encountered an error`, e.data.payload.error);
                     }
                 };
                 worker.postMessage({
-                    "integer" : quotient.toString(),
+                    "status" : "factor",
+                    "payload" : {
+                        "quotient" : quotient.toString(),
+                        "integer" : integer.toString(),
+                        "lastFactor" : lastFactor ? lastFactor.toString() : ""
+                    },
                     "key" : key
                 });
             }
             factorIndex++;
         });
     }
-
-    function factorRecursion (integer, quotient, observer) {
-        let factorPromise;
-        factorPromise = new Promise((factorRecursionResolve, factorRecursionReject) => {
-            const one = new Decimal(1);
-            // base case stops the recursion
-            cancelFunctions.push(factorRecursionReject);
-            if (quotient.equals(one)) {
-                factorRecursionResolve();
-            } else {
-                getNextFactor(integer, quotient, observer)
-                    .then((newFactor) => {
-                        // by the logic of the computation
-                        // 'factor' should be an integer divisor
-                        // of quotient
-                        let newQuotient = quotient.div(newFactor);
-                        observer.next({
-                            status : "factor",
-                            payload : {
-                                factor : newFactor
-                            }
-                        });
-                        // I want the window painted before
-                        // we move on to the next computation
-                        try {
-                            waitFunction(() => {
-                                factorRecursion(integer, newQuotient, observer)
-                                    .then(() => {
-                                        factorRecursionResolve();
-                                    })
-                                    .catch((e) => {
-                                        console.debug("encountered an unexpected error: halting");
-                                        factorRecursionReject(e);
-                                    });
-                            });
-                        } catch (e) {
-                            console.debug("was not able to use $nextTick and requestAnimationFrame");
-                            factorRecursion(integer, newQuotient, observer);
-                        }
-                    })
-                    .catch((e) => {
-                        if (e === "halt") {
-                            factorRecursionReject("halt");
-                        } else {
-                            observer.next({
-                                status : "error",
-                                payload : {
-                                    error : e
-                                }
-                            });
-                            console.debug("encountered an unexpected error");
-                            console.log(e);
-                            factorRecursionReject(e);
-                        }
-                    });
+    
+    async function factorRecursion (integer, quotient, observer) {
+        console.debug(`${id}  factor recursion: integer:${integer}; quotient:${quotient};`);
+        const one = new Decimal(1);
+        if (quotient.equals(one)) {
+            console.debug(`${id} reached base case 1: resolving factor recursion;`);
+            return;
+        }
+        const nextFactor = await getNextFactor(integer, quotient, observer);
+        lastFactor = nextFactor;
+        console.log(`${id}  getNextFactor returned: ${nextFactor}`);
+        observer.next({
+            status : "factor",
+            payload : {
+                factor : nextFactor
             }
-
         });
-        return factorPromise;
+        let newQuotient = quotient.div(nextFactor);
+        if (!globalHalt) {
+            if (typeof waitFunction === Function) {
+                return await waitFunction(() => factorRecursion (integer, newQuotient, observer));
+            } else {
+                return await factorRecursion (integer, newQuotient, observer);
+            }
+        } else {
+            console.debug(`${id} halted`);
+            return;
+        }
     }
 
     // integer is a Decimal
     const factor = function (integer, workerIn, waitFunctionIn, subscriber) {
+        globalHalt = false;
+        console.log(`${id}: begin factoring integer : ${integer}.`);
+        we.assert.atLevel("ERROR").that(`input ${integer.toString()} is an integer`, integer.floor().equals(integer));
         let factorPromise;
         let observable;
         factorPromise = new Promise((factorResolve, factorReject) => {
@@ -283,13 +285,24 @@ const factorize = function () {
             worker = workerIn;
             factorIndex = 0;
             
+            // when someone executes subscribe on the
+            // observable, that fires the factorRecursion
+            // to find the next factor
+
             observable = new Observable((observer) => {
+                console.log(`${id} starting factorRecursion`);
                 factorRecursion(integer, integer, observer)
                     .then(() => {
+                        console.debug(`${id} sending success event`);
+                        observer.next({
+                            status : "success"
+                        });
                         factorResolve("success");
                     })
                     .catch((e) => {
+                        
                         if (e === "halt") {
+                            console.debug(`${id} halt`);
                             factorReject("halt");
                         } else {
                             observer.next({
@@ -298,16 +311,22 @@ const factorize = function () {
                                     error : e
                                 }
                             });
-                            console.debug("an unexpected error has occured: halting");
+                            console.debug("${id} an unexpected error has occured", e);
                             factorReject(e);
                         }
                     });
             });
         });
         subscriber.observable = observable;
-        Object.assign(subscriber, { observable, clear});
+        Object.assign(subscriber, { observable, clear });
         return factorPromise;
+    };
+    factor.getId = () => {
+        return id;
     };
     return factor;
 };
-export default factorize();
+const factorizer = () => {
+    return factorize(); // returns a new scoped factor function
+};
+export default factorizer;

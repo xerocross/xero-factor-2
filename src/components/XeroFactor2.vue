@@ -53,16 +53,14 @@
 <script>
 import Debounce from "lodash.debounce";
 import { Decimal } from "decimal.js";
-import factorize from "../factorizer.js";
+import factorizer from "../factorizer.js";
 
 Decimal.set({ precision : 64 });
 
 export default {
     props : {
         worker : {
-            default : () => {
-                return null;
-            }
+            default : null
         },
         done : {
             type : Function,
@@ -82,6 +80,7 @@ export default {
     data () {
         return {
             integerInput : "2",
+            lastInteger : undefined,
             factors : [],
             observables : [],
             integer : new Decimal(2),
@@ -92,7 +91,8 @@ export default {
             factorIndex : 0,
             workingString : "",
             history : [],
-            currentActivity : ""
+            currentActivity : "",
+            factorize : () => {}
         };
     },
     watch : {
@@ -102,6 +102,7 @@ export default {
             let check = this.checkValidInput(newValue);
             console.debug(`ran input validity check: ${check}`);
             if (check) {
+                this.lastInteger = this.integer;
                 this.integer = new Decimal(newValue);
                 this.clear();
                 this.factor()
@@ -135,7 +136,6 @@ export default {
         }, 100)
     },
     mounted () {
-        this.pushHistory(`component mounted`);
         this.animateWaiting();
         if (this.worker !== null) {
             console.debug("found web worker");
@@ -143,6 +143,7 @@ export default {
         } else {
             this.workerFound(false);
         }
+        this.pushHistory(`component mounted`);
     },
     methods : {
         checkValidInput (input) {
@@ -171,6 +172,7 @@ export default {
             }, 1000);
         },
         halt () {
+            console.trace();
             if (this.clearFactorize) {
                 this.clearFactorize();
                 this.clearFactorize = undefined;
@@ -178,7 +180,20 @@ export default {
             for (let obs of this.observables) {
                 obs.cancel();
             }
-            this.pushHistory(`work halted`);
+            if (this.worker) {
+                console.log(this.worker);
+                // eslint-disable-next-line vue/no-mutating-props
+                console.debug(`halting ${this.lastInteger}`);
+                this.pushHistory(`attempting to halt worker on integer ${this.lastInteger}`);
+                if (this.lastInteger) {
+                    this.worker.postMessage({
+                        "status" : "halt",
+                        "payload" : {
+                            "integer" : this.lastInteger.toString()
+                        }
+                    });
+                }
+            }
         },
         clear () {
             this.factors = [];
@@ -202,7 +217,8 @@ export default {
             };
             let factorString = getFactorString();
             return `XeroFactor2 State:
-                input: ${this.integerInput}; 
+                input: ${this.integerInput};
+                factorId : ${this.factorize.getId ? this.factorize.getId() : ""};
                 factors: ${factorString};
                 num observables: ${this.observables.length};
                 factors: ${factorString};
@@ -261,6 +277,7 @@ export default {
             return (product.equals(this.integer));
         },
         factor () {
+            this.factorize = factorizer();
             this.pushHistory(`Started factoring ${this.integer}.`);
             this.beginningWork();
             console.debug("factoring");
@@ -274,7 +291,7 @@ export default {
                     });
                 });
             };
-            const factorPromise = factorize(this.integer, this.worker, waitFunction, subscriber);
+            const factorPromise = this.factorize(this.integer, this.worker, waitFunction, subscriber);
             this.clearFactorize = subscriber.clear;
 
             subscriber.observable.subscribe((event) => {
