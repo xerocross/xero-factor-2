@@ -277,7 +277,7 @@ export default {
             return (product.equals(this.integer));
         },
         factor () {
-            this.factorize = Factorizer();
+            this.factorize = new Factorizer().factor;
             this.pushHistory(`Started factoring ${this.integer}.`);
             this.beginningWork();
             console.debug("factoring");
