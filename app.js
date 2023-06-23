@@ -1,4 +1,4 @@
-/* eslint-disable no-undef */
+/* global require process */
 const express = require("express");
 const app = express();
 const port = process.env.PORT || 3000;
