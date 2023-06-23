@@ -1,4 +1,4 @@
-# xero-factor-2 (2023)
+# Xero-Factor-2 (2023)
 
 This is a little Vue widget for computing the prime factors of an integer greater than 1.  If a web worker is available, computation is offloaded to the worker.
 
