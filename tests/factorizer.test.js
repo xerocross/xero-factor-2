@@ -33,6 +33,9 @@ const testFunction = function (configObject, timeout) {
         we.assert.atLevel("ERROR").that("subscriber now has observable object defined", subscriber.observable !== undefined);
         let factorEventIndex = 0;
         const resultFactors = [];
+        const timeoutId = setTimeout(() => {
+            reject();
+        }, timeout || 500);
         subscriber.observable.subscribe((event) => {
             console.log("event", event);
             if (event.status === "factor") {
@@ -40,18 +43,13 @@ const testFunction = function (configObject, timeout) {
                 factorEventIndex++;
             }
             if (event.status === "success") {
+                clearTimeout(timeoutId);
                 resolve(resultFactors);
             }
         });
-        setTimeout(() => {
-            reject();
-        }, timeout || 500);
+        
     });
 };
-
-
-
-
 
 describe("no web worker", () => {
     describe("no wait function", () => {
