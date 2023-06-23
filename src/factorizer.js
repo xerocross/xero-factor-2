@@ -5,7 +5,7 @@ import WeAssert from "we-assert";
 import isPrime from "./PrimeChecker.js";
 import { v4 as uuidv4 } from "uuid";
 
-const factorize = function () {
+function Factorizer () {
     Decimal.set({ precision : 64 });
     let id = uuidv4().substring(0,8);
     let worker;
@@ -45,7 +45,7 @@ const factorize = function () {
         we.assert.atLevel("ERROR").that("quotient is an integer", quotient.floor().equals(quotient));
         let isFactorResolved = false;
         return new Promise((nextFactorResolve, nextFactorReject) => {
-            let key = "" + id + integer.toString() + factorIndex;
+            let key = "" + integer.toString() + factorIndex;
             let lastCheckedNumber;
             // keep track of the reject functions
             // so we can halt promises abruptly
@@ -273,7 +273,7 @@ const factorize = function () {
     }
 
     // integer is a Decimal
-    const factor = function (integer, workerIn, waitFunctionIn, subscriber) {
+    this.factor = function (integer, workerIn, waitFunctionIn, subscriber) {
         globalHalt = false;
         console.log(`${id}: begin factoring integer : ${integer}.`);
         we.assert.atLevel("ERROR").that(`input ${integer.toString()} is an integer`, integer.floor().equals(integer));
@@ -321,12 +321,8 @@ const factorize = function () {
         Object.assign(subscriber, { observable, clear });
         return factorPromise;
     };
-    factor.getId = () => {
+    this.factor.getId = () => {
         return id;
     };
-    return factor;
 };
-const factorizer = () => {
-    return factorize(); // returns a new scoped factor function
-};
-export default factorizer;
+export default Factorizer;

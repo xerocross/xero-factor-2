@@ -1,4 +1,4 @@
-import factorizer from "../src/factorizer";
+import Factorizer from "../src/Factorizer";
 import Decimal from "decimal.js";
 import WeAssert from "we-assert";
 
@@ -25,7 +25,7 @@ const testFunction = function (configObject, timeout) {
     return new Promise((resolve, reject) => {
         const integer = new Decimal(configObject.integer);
         we.assert.atLevel("ERROR").that("right now factor is undefined", factor === undefined);
-        const factor = factorizer(); // each factor function has its own scope
+        const factor = new Factorizer().factor; // each factor function has its own scope
         const subscriber = {};
         factor(integer, configObject.worker, configObject.waitFunction, subscriber);
         // factor adds the observable object to the subscriber
@@ -90,6 +90,19 @@ describe("no web worker", () => {
                 integer : new Decimal(7883)
             });
             expect(resultFactors[0].equals(new Decimal(7883))).toBeTruthy();
+        });
+    });
+    describe("with wait function", () => {
+        test("factors of 25 are (5)(5)", async () => {
+            const waitFun = (inputFunction) => {
+                inputFunction();
+            };
+            const resultFactors = await testFunction({
+                integer : new Decimal(25),
+                waitFunction : waitFun
+            });
+            expect(resultFactors[0].equals(new Decimal(5))).toBeTruthy();
+            expect(resultFactors[1].equals(new Decimal(5))).toBeTruthy();
         });
     });
 });
