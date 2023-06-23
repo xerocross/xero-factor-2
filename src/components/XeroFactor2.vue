@@ -154,7 +154,15 @@ export default {
             }
             let pattern = new RegExp(/^\d+$/);
             let match = pattern.exec(input);
-            if (match !== null && match[0] === input) {
+            let parsedDec;
+            let isGreaterThan1 = false;
+            try {
+                parsedDec = new Decimal(input);
+                isGreaterThan1 = parsedDec.greaterThan(new Decimal(1));
+            } catch (e) {
+                console.error("input could not be parsed as a decimal");
+            }
+            if (match !== null && match[0] === input && isGreaterThan1) {
                 test = true;
             } else {
                 test = false;
