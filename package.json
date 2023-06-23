@@ -10,7 +10,7 @@
     "format": "prettier --write src/",
     "test:integration": "jest --testPathPattern=tests/integration --silent --verbose",
     "test:silent": "jest --silent",
-    "test:unit": "jest --config jest.unit.config.js --verbose",
+    "test:unit": "jest --config jest.unit.config.js --verbose --silent",
     "start" : "node app.js"
   },
   "dependencies": {
