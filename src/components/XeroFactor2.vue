@@ -1,7 +1,7 @@
 <template>
     <div class="factor-widget">
         <div class="outer">
-            <p class="intro">Enter a positive integer to find its prime factors.</p>
+            <p class="intro">Enter an integer > 1 to find its prime factors.</p>
             <p>Computation happens <em>on your computer</em> so speed may vary. By 
                 definition 1 is not prime, so it is not accepted as input.</p>
             <div class = "alert alert-danger" role="alert" v-if="isError">
@@ -53,7 +53,7 @@
 <script>
 import Debounce from "lodash.debounce";
 import { Decimal } from "decimal.js";
-import factorizer from "../factorizer.js";
+import Factorizer from "../Factorizer.js";
 
 Decimal.set({ precision : 64 });
 
@@ -277,7 +277,7 @@ export default {
             return (product.equals(this.integer));
         },
         factor () {
-            this.factorize = factorizer();
+            this.factorize = Factorizer();
             this.pushHistory(`Started factoring ${this.integer}.`);
             this.beginningWork();
             console.debug("factoring");
