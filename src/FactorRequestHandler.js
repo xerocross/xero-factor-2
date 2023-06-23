@@ -2,7 +2,7 @@ import Decimal from "decimal.js";
 const FactorRequestHandler = function () {
     let factorEvents = {};
     this.post = function (event) {
-        console.debug("CALLED handleFactorRequest");
+        console.debug("called FactorRequestHandler:post");
         // event = {
         //     status : "factor",
         //     payload : {
@@ -29,7 +29,7 @@ const FactorRequestHandler = function () {
                     if (i.greaterThanOrEqualTo(max)) {
                         console.debug(`found i:${i} >= max:${max}`);
                         // quotient is prime
-                        resolve({"factor" : quotient });
+                        resolve({status : "factor", payload : {"factor" : quotient.toString() }});
                     } else {
                         setTimeout(() => {
                             while(i.lessThan(end)) {
@@ -40,7 +40,7 @@ const FactorRequestHandler = function () {
                                 }
                                 let test = quotient.modulo(i).equals(0);
                                 if (test) {
-                                    resolve({"factor" : i });
+                                    resolve({status : "factor", payload : {"factor" : i.toString() }});
                                     return;
                                 }
                                 lastIntegerTested = i;
@@ -53,7 +53,13 @@ const FactorRequestHandler = function () {
                                 resolve(computeSubinterval(quotient, end, end.plus(intervalLength), intervalLength));
                             } else {
                                 console.debug(`successfully halted: ${event.data.payload.integer}`);
-                                reject("halt");
+                                resolve({
+                                    status : "halted",
+                                    payload : {
+                                        "message" : `successfully halted: ${event.data.payload.integer}`,
+                                        "integer" : event.data.payload.integer
+                                    }
+                                });
                             }
                         }, 0);
                     }
@@ -102,10 +108,8 @@ const FactorRequestHandler = function () {
                 .then((result) => {
                     console.log("result", result);
                     return {
-                        status : "factor",
-                        payload : {
-                            "factor" : result.factor.toString()
-                        },
+                        status : result.status,
+                        payload : result.payload,
                         key : event.data.key
                     };
                 })
