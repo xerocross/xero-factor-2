@@ -81,7 +81,7 @@ function Factorizer () {
                 if (i.greaterThanOrEqualTo(intervalDetails.globalMax)) {
                     // terminate
                     console.log(`terminating interval: ${index}; will return ${quotient}`);
-                    we.assert.atLevel("DEBUG").that("quotient is prime", isPrime(quotient));
+                    we.assert.atLevel("DEBUG").that("quotient is prime", () => isPrime(quotient));
                     return Promise.resolve(quotient);
                 }
                 return new Promise((intervalResolve, intervalReject) => {

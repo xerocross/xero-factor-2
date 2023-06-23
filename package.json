@@ -11,7 +11,7 @@
     "test:integration": "jest --testPathPattern=tests/integration --silent --verbose",
     "test:silent": "jest --silent",
     "test:unit": "jest --config jest.unit.config.js --verbose --silent",
-    "start" : "node app.js"
+    "start": "node app.js"
   },
   "dependencies": {
     "decimal.js": "^10.4.3",
@@ -19,7 +19,7 @@
     "lodash.debounce": "^4.0.8",
     "q": "^1.5.1",
     "vue": "^3.3.2",
-    "we-assert": "^5.0.1"
+    "we-assert": "^5.1.1"
   },
   "devDependencies": {
     "@babel/preset-env": "^7.22.4",
