@@ -1,5 +1,22 @@
 import Decimal from "decimal.js";
+import WeAssert from "we-assert";
+import DataIs from "@xerocross/data-is";
+
 const FactorRequestHandler = function () {
+    const we = WeAssert.build();
+    const data = DataIs.build();
+    data.define.type("positive integer", (x) => {
+        try {
+            const pattern = /^\d+$/;
+            return pattern.test(x);
+        } catch (e) {
+            return false;
+        }
+    });
+    const D = (x) => {
+        return new Decimal(x);
+    };
+
     let factorEvents = {};
     this.post = function (event) {
         console.debug("called FactorRequestHandler:post");
@@ -14,27 +31,43 @@ const FactorRequestHandler = function () {
         let lastIntegerTested;
         
         function doComputation (start, quotient, isHalt) {
+            /*
+            * setup initial computation values
+            */
+            
             const squareRoot = quotient.squareRoot();
-            const max = squareRoot.ceil().plus(new Decimal(1));
-            const length = max.minus(start);
-            const intervalLength = Decimal.max(length.div(new Decimal(1000)).floor(), new Decimal(1000));
-            let intervalIndex = 0;
-            function computeSubinterval (quotient, start, end, intervalLength) {
-                console.debug(`COMPUTING SUBINTERVAL ${intervalIndex}`);
+            const max = squareRoot.ceil().plus(D(1));
+            // mathematically, the smallest factor of quotient is now < max
 
+            /*
+            * For large numbers, we divide the work up into subintervals so that
+            * there will be at most 1000 subintervals before finding the next factor.
+            * If the total number of possible divisors we have to check is small
+            *  (< 1000) then we default to using just one interval of length 1000.
+            */
+            const length = max.minus(start);
+            const intervalLength = Decimal.max(length.div(D(1000)).floor(), D(1000));
+            let intervalIndex = 0;
+            
+            
+            
+            function computeSubinterval (quotient, start, end, intervalLength) {
                 console.debug(`computeSubinterval quotient: ${quotient}; start: ${start}; end: ${end}; intervalLength: ${intervalLength}; max: ${max}`);
                 return new Promise((resolve, reject) => {
-                    console.debug(`inside promise: quotient: ${quotient}; start: ${start}; max: ${max}`);
                     let i = start;
                     if (i.greaterThanOrEqualTo(max)) {
                         console.debug(`found i:${i} >= max:${max}`);
-                        // quotient is prime
+                        /*
+                        * Reaching this line implies that no divisor of the quotient has been found
+                        * from start until max, which implies that quotient is prime. Thus quotient
+                        * itself is the next factor.
+                        */
                         resolve({status : "factor", payload : {"factor" : quotient.toString() }});
                     } else {
                         setTimeout(() => {
                             while(i.lessThan(end)) {
                                 if (lastIntegerTested) {
-                                    if (!lastIntegerTested.plus(new Decimal(1)).equals(i)) {
+                                    if (!lastIntegerTested.plus(D(1)).equals(i)) {
                                         reject(new Error(`a number was skipped: testing ${i} but last tested number was ${lastIntegerTested}!`));
                                     }
                                 }
@@ -69,9 +102,15 @@ const FactorRequestHandler = function () {
             return computeSubinterval(quotient, start, start.plus(intervalLength), intervalLength);
         }
         
-        if (event.data.status === "factor") {
-            let halt = false;
+        
 
+        if (event.data.status === "factor") {
+
+            /*
+            * read input and set up for factoring
+            */
+
+            let halt = false; // 
             const haltFunction = () => {
                 halt = true;
             };
@@ -84,16 +123,19 @@ const FactorRequestHandler = function () {
             let quotient;
             let lastFactor;
             let start;
+            lastIntegerTested = undefined;
             try {
-                quotient = new Decimal(event.data.payload.quotient);
-                lastIntegerTested = undefined;
+                we.assert.atLevel("DEBUG").that(data(event.data.payload.quotient).is.a("positive integer"));
+                quotient = D(event.data.payload.quotient);
+                
                 lastFactor;
                 if (event.data.payload.lastFactor === "") {
-                    lastFactor = new Decimal(1);
+                    lastFactor = D(1);
                 } else {
-                    lastFactor = new Decimal(event.data.payload.lastFactor);
+                    we.assert.atLevel("ERROR").that(data(event.data.payload.lastFactor).is.a("positive integer"));
+                    lastFactor = D(event.data.payload.lastFactor);
                 }
-                start = Decimal.max(new Decimal(2), lastFactor);
+                start = Decimal.max(D(2), lastFactor);
             } catch (e) {
                 return Promise.resolve({
                     status : "error",
@@ -103,6 +145,9 @@ const FactorRequestHandler = function () {
                     }
                 });
             }
+
+
+
             console.log(`starting doComputation`);
             return doComputation(start, quotient, isHalt)
                 .then((result) => {
@@ -115,7 +160,6 @@ const FactorRequestHandler = function () {
                 })
                 .catch((e) => {
                     if (e === "halt") {
-
                         return {
                             status : "halted",
                             payload : {
