@@ -26,5 +26,5 @@ function Observable (subscribeFunction) {
     this.cancel = () => {
         subscriberUpdateFunction = () => {};
     };
-};
+}
 export { Observable };

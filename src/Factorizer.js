@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from "uuid";
 
 function Factorizer () {
     Decimal.set({ precision : 64 });
-    let id = uuidv4().substring(0,8);
+    let id = uuidv4().substring(0, 8);
     let worker;
     let factorIndex;
     let offsetSubscribers = [];
@@ -324,5 +324,5 @@ function Factorizer () {
     this.factor.getId = () => {
         return id;
     };
-};
+}
 export default Factorizer;

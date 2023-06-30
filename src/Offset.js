@@ -20,10 +20,10 @@ const offset = (inputCodeBlockFunction, subscriber) => {
                 isResolved = true;
             } catch (resolution) {
                 reject({
-                    id , resolution, cancel
+                    id, resolution, cancel
                 });
             }
-        },0);
+        }, 0);
         subscriber.id = id;
         subscriber.cancel = () => {
             reject("halt");
