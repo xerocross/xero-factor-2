@@ -4,13 +4,30 @@ require("@rushstack/eslint-patch/modern-module-resolution");
 module.exports = {
     root : true,
     "plugins" : [
-        "jest"
+        "jest",
+        "@typescript-eslint"
     ],
     "extends" : [
         "plugin:vue/vue3-essential",
         "eslint:recommended",
         "@vue/eslint-config-prettier/skip-formatting",
-        "plugin:jest/recommended"
+        "plugin:jest/recommended",
+        "plugin:@typescript-eslint/eslint-recommended",
+        "plugin:@typescript-eslint/recommended"
+    ],
+    "overrides" : [
+        {
+            "files" : ["*.ts"],
+            "parser" : "@typescript-eslint/parser",
+            "plugins" : ["@typescript-eslint"]
+        },
+        {
+            "files" : ["*.vue"],
+            "parser" : "vue-eslint-parser",
+            "parserOptions" : {
+                "parser" : "@typescript-eslint/parser"
+            }
+        }
     ],
     parserOptions : {
         ecmaVersion : "latest"
@@ -31,7 +48,7 @@ module.exports = {
             "afterColon" : true,
             "mode" : "strict"
         }],
-        "vue/html-self-closing" : [0],
+        "vue/html-self-closing" : "off",
         "space-before-function-paren" : ["error", "always"],
         "arrow-spacing" : ["error", { before : true, after : true }],
         "no-case-declarations" : 0,
@@ -39,7 +56,14 @@ module.exports = {
         "quotes" : ["error", "double", { "allowTemplateLiterals" : true }],
         "semi" : ["error", "always"],
         "jest/no-done-callback" : "off",
-        "jest/no-conditional-expect" : "off"
+        "jest/no-conditional-expect" : "off",
+        "@typescript-eslint/no-explicit-any" : "off",
+        "@typescript-eslint/no-empty-function" : "off",
+        "comma-spacing" : ["error", { "after" : true }],
+        "@typescript-eslint/type-annotation-spacing" : ["error", {
+            "before" : true,
+            "after" : false
+        }]
     },
     globals : {
         "env" : false,
