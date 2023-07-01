@@ -1,6 +1,11 @@
 import "./assets/main.css";
 import { createApp } from "vue";
 import XeroFactor2 from "./components/XeroFactor2.vue";
+import queryString from "query-string";
+
+
+const locationQueryString = window.location.search;
+const queryObject = queryString.parse(locationQueryString);
 
 try {
     let myWorker;
@@ -10,7 +15,8 @@ try {
         });
     }
     createApp(XeroFactor2, {
-        worker : myWorker
+        worker : myWorker,
+        queryObject : queryObject
     }).mount("#xero-factor-2");
     
 }

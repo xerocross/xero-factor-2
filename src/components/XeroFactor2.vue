@@ -71,13 +71,16 @@
 <script>
 import Debounce from "lodash.debounce";
 import { Decimal } from "decimal.js";
-import Factorizer from "../Factorizer.js";
+import Factorizer from "../Factorizer";
 
 Decimal.set({ precision : 64 });
 
 export default {
     props : {
         worker : {
+            default : null
+        },
+        queryObject : {
             default : null
         },
         done : {
@@ -303,7 +306,7 @@ export default {
             return (product.equals(this.integer));
         },
         factor () {
-            this.factorize = new Factorizer().factor;
+            this.factorize = new Factorizer(this.queryObject).factor;
             this.pushHistory(`Started factoring ${this.integer}.`);
             this.beginningWork();
             console.debug("factoring");
