@@ -1,0 +1,1 @@
+export type WaitFunction = (func : ((...args : any) => void)) => (Promise<void>);
