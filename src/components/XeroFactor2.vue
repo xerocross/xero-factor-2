@@ -1,10 +1,18 @@
 <template>
     <div class="factor-widget">
         <div class="outer">
-            <p class="intro">Enter an integer > 1 to find its prime factors.</p>
-            <p>Computation happens <em>on your computer</em> so speed may vary. By 
-                definition 1 is not prime, so it is not accepted as input.</p>
-            <div class = "alert alert-danger" role="alert" v-if="isError">
+            <p class="intro">
+                Enter an integer > 1 to find its prime factors.
+            </p>
+            <p>
+                Computation happens <em>on your computer</em> so speed may vary. By 
+                definition 1 is not prime, so it is not accepted as input.
+            </p>
+            <div
+                v-if="isError"
+                class="alert alert-danger"
+                role="alert"
+            >
                 An error has occurred.
             </div>
             <div class="row">
@@ -18,7 +26,7 @@
                                     class="primary-number-input"
                                     :class="invalidInput ? 'red-border' : ''"
                                     type="text"
-                                />
+                                >
                             </form>
                         </div>
                     </div>
@@ -33,13 +41,23 @@
                         <span v-if="invalidInput">
                             (invalid input)
                         </span>
-                        <span class="factors-list" v-if="!isError && !invalidInput">
+                        <span
+                            v-if="!isError && !invalidInput"
+                            class="factors-list"
+                        >
                             =
-                            <span v-for="i in factors" :key="i.key" class="factor-item">
+                            <span
+                                v-for="i in factors"
+                                :key="i.key"
+                                class="factor-item"
+                            >
                                 ({{ i.string }})
                             </span>
                             <span ref="working">
-                                <span v-if="isWorking" class="is-working-message">
+                                <span
+                                    v-if="isWorking"
+                                    class="is-working-message"
+                                >
                                     (WORKING){{ workingString }}
                                 </span>
                             </span>
