@@ -311,9 +311,14 @@ export default {
             this.isWorking = true;
             const subscriber = {};
             let waitFunction = (infun) => {
-                this.$nextTick(() => {
-                    window.requestAnimationFrame(() => {
-                        infun();
+                return new Promise((resolve) => {
+                    this.$nextTick(() => {
+                        console.log("wait:nextTick");
+                        window.requestAnimationFrame(() => {
+                            console.log("wait:requestAnimationFrame");
+                            console.log("infun", infun);
+                            resolve(infun());
+                        });
                     });
                 });
             };
