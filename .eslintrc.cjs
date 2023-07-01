@@ -62,7 +62,7 @@ module.exports = {
         "comma-spacing" : ["error", { "after" : true }],
         "@typescript-eslint/type-annotation-spacing" : ["error", {
             "before" : true,
-            "after" : false
+            "after" : true
         }]
     },
     globals : {
