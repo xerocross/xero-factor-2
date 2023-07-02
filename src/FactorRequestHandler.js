@@ -169,45 +169,7 @@ const FactorRequestHandler = function () {
                     });
                     let initialValue = Decimal.max(D(2), lastFactor);
                     return {quotient, initialValue};
-                });
-                console.log(`starting doComputation`);
-                return letUs("start executing computation recursion", () => {
-                    return findNextFactor(initialValue, quotient, isHalt)
-                        .then(
-                            since("next factor computation is finished", () => {
-                                return letUs("send next factor result back to main thread", () => {
-                                    return (result) => {
-                                        return {
-                                            status : result.status,
-                                            payload : result.payload,
-                                            key : event.data.key
-                                        };
-                                    };
-                                });
-                            })
-                        )
-                        .catch((e) => {
-                            if (weHave("exception was a halt request, not an error", e === "halt")) {
-                                return {
-                                    "status" : "halted",
-                                    "payload" : {
-                                        "integer" : event.data.payload.integer
-                                        
-                                    },
-                                    "key" : event.data.key
-                                };
-                            } else {
-                                return {
-                                    "status" : "error",
-                                    "payload" : {
-                                        "error" : e,
-                                        "integer" : event.data.payload.integer
-                                    },
-                                    "key" : event.data.key
-                                };
-                            }
-                        });
-                });
+                }));
             } catch (e) {
                 return since("we encountered an error during the basic setup of the computation", () => {
                     return letUs("return the error to the main thread", () => {
@@ -221,6 +183,45 @@ const FactorRequestHandler = function () {
                     });
                 });
             }
+
+            console.log(`starting doComputation`);
+            return letUs("start executing computation recursion", () => {
+                return findNextFactor(initialValue, quotient, isHalt)
+                    .then(
+                        since("next factor computation is finished", () => {
+                            return letUs("send next factor result back to main thread", () => {
+                                return (result) => {
+                                    return {
+                                        status : result.status,
+                                        payload : result.payload,
+                                        key : event.data.key
+                                    };
+                                };
+                            });
+                        })
+                    )
+                    .catch((e) => {
+                        if (weHave("exception was a halt request, not an error", e === "halt")) {
+                            return {
+                                "status" : "halted",
+                                "payload" : {
+                                    "integer" : event.data.payload.integer
+                                    
+                                },
+                                "key" : event.data.key
+                            };
+                        } else {
+                            return {
+                                "status" : "error",
+                                "payload" : {
+                                    "error" : e,
+                                    "integer" : event.data.payload.integer
+                                },
+                                "key" : event.data.key
+                            };
+                        }
+                    });
+            });
         } else if (weHave("the main thread sent a halt request", event.data.status === "halt")) {
             console.debug(`received request to halt ${event.data.payload.integer}; attempting`);
             given("the handler has received a request to halt", factorEvents[event.data.payload.integer], () => {
