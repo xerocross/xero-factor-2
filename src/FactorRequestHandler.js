@@ -76,12 +76,8 @@ const FactorRequestHandler = function () {
                             new Scheduler().schedule(() => {
                                 letUs("find the smallest i in the subinterval, if any, that divides the quotient", () => {
                                     for (; i.lessThan(subintervalMax); i = i.plus(D(1))) {
-                                        try {
-                                            we.assert.atLevel("ERROR").that("after i = globalFirst, then i = lastIntegerTested + 1", i == globalFirst || lastIntegerTested.plus(D(1)).equals(i));
-                                        }
-                                        catch(e) {
-                                            console.error(`i: ${i}; quotient: ${quotient}; lastCheckedNumber: ${lastIntegerTested}; globalFirst: ${globalFirst}`);
-                                        }
+                                        we.assert.atLevel("ERROR").that("after i = globalFirst, then i = lastIntegerTested + 1", i == globalFirst || lastIntegerTested.plus(D(1)).equals(i));
+                                        
                                         let iDividesQuotient = quotient.modulo(i).equals(0);
                                         if (check("i is a factor of quotient", iDividesQuotient)) {
                                             letUs("send i back as first factor", () => {
@@ -91,8 +87,12 @@ const FactorRequestHandler = function () {
                                             });
                                             break;
                                         }
+
                                         since("we want to make sure we don't accidentally skip any number", () => {
-                                            lastIntegerTested = i;
+                                            letUs("keep track of this number for comparison in the next iteration", () => {
+                                                lastIntegerTested = i;
+                                            });
+                                            
                                         });
                                     }
                                 });
@@ -109,8 +109,7 @@ const FactorRequestHandler = function () {
                                                     "message" : `successfully halted: ${integer}`,
                                                     "integer" : integer
                                                 }
-                                            }
-                                            );
+                                            });
                                         });
                                     });
                                 } else {
@@ -133,7 +132,7 @@ const FactorRequestHandler = function () {
             });
         }
         
-        if (weHave("the main thread has posted a next factor request", event.data.status === "factor")) {
+        if (weHave("the main thread posted a next factor request", event.data.status === "factor")) {
             const { isHalt } = 
             letUs("set up halt function for this integer factoring", () => {
                 let halt = false;
@@ -148,9 +147,9 @@ const FactorRequestHandler = function () {
                 };
                 return { isHalt };
             });
-            
+            let quotient, initialValue;
             try {
-                let {quotient, initialValue} 
+                ({quotient, initialValue} 
                 = letUs("setup values for interval computation", () => {
                     we.assert.atLevel("DEBUG").that(data(event.data.payload.quotient).is.a("positive integer"));
                     let quotient = D(event.data.payload.quotient);

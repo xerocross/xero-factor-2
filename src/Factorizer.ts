@@ -71,19 +71,32 @@ function Factorizer (queryObject : any) {
                 = weKnowThat(`if quotient is a perfect square like 25, then we must
                 include its square root as a factor, so the values i that
                 we check must go up to at least the square root`, () => {
-                    return soWe(`define the globalMax to be one greater`, () => {
+                    return soWe(`define the globalMax to be one greater: thus 
+                    the globalMax is an exclusive upper bound`, () => {
                         const globalMax = quotient.squareRoot().ceil().plus(1);
                         return { globalMax };
                     });
                 });
+                weKnowThat(`the value of globalMax should not change`);
                 
                 // plus 1 accounts for numbers that are perfect squares
                 // set an intervalLength that is meaningful
                 // to the size of the input
-                const globalDiv1000 = globalMax.div(new Decimal(100)).floor();
+                const { globalDiv1000 }
+                = since("we want the computation length to be associated to the size of the computation", () => {
+                    return letUs(`choose a length of globalmax / 1000 so theoretically
+                    there are a maximum of 1000 intervals to check`, () => {
+                        return { globalDiv1000 : globalMax.div(new Decimal(100)).floor() };
+                    });
+                });
                 // the following ternary logic is to handle the case
                 // where quotient is a relatively small number
-                const intervalLength = globalDiv1000.equals(D(0)) ? D(1000) : globalDiv1000;
+                const { intervalLength }
+                = since(`dividing by 1000 doesn't work well for small numbers, if 
+                globalDiv1000 is 0, then instead we set the interval length at 1000`,() => {
+                 return { intervalLength : globalDiv1000.equals(D(0)) ? D(1000) : globalDiv1000 };
+                });
+
                 const globalStartValue = new Decimal(2);
                 we.assert.atLevel("ERROR").that("globalStartValue >= 2", globalStartValue.greaterThanOrEqualTo(D(2)));
                 weKnowThat(`if intervalLength=1000 and globalMax=3 then globalMax.div(intervalLength)=
@@ -137,17 +150,24 @@ function Factorizer (queryObject : any) {
                         // check all numbers in the interval
                         // until either we find a factor
                         // or we reach the global max
-                        const subscriber : Subscriber = {
-                            cancel : () => {},
-                            observable : null
-                        };
+
+                        let watcher : Watcher =
+                        letUs("build an empty Watcher object to be passed into the schedule function", () => {
+                            return {
+                                cancel : () => {},
+                                id : undefined
+                            };
+                        });
                         const scheduledObject = new Scheduler().schedule(() => {
                             // begin main asynchronous computation function
-                            if (check("i >= global max", i.greaterThanOrEqualTo(globalMax))) {
-                                weKnowThat("quotient is prime");
-                                letUs("return that the first factor of quotient is quotient", () => {
-                                    intervalResolve(quotient);
-                                });
+                            if (weHave("i >= global max", i.greaterThanOrEqualTo(globalMax))) {
+                                weKnowThat("quotient is prime",
+                                    so("return that the first factor of quotient is quotient", () => {
+                                        intervalResolve(quotient);
+                                        isFactorResolved = true;
+                                    })
+                                );
+
                                 return;
                             }
                             // find smallest i that divides quotient
