@@ -1,11 +1,12 @@
-import { Observable, Observer } from "./Observable";
+import { Observable } from "./Observable";
+import { Subscriber, Observer } from "./Observable.d";
 import { Decimal } from "decimal.js";
-import Scheduler from "./Scheduler.js";
+import Scheduler from "./Scheduler";
+import { Watcher } from "./Scheduler.d";
 import WeAssert from "we-assert";
 import isPrime from "./PrimeChecker.js";
 import { v4 as uuidv4 } from "uuid";
-import { check, since, weKnowThat, letUs, weHave, soWe } from "@xerocross/literate";
-import Subscriber from "./Subscriber";
+import { check, since, weKnowThat, letUs, weHave, soWe, so } from "@xerocross/literate";
 
 type CancelFunction = (command : string) => void;
 type WaitFunction = (func : ((...args : any) => void)) => (() => void);
@@ -23,7 +24,7 @@ function Factorizer (queryObject : any) {
     const id = uuidv4().substring(0, 8);
     let worker : Worker;
     let factorIndex : number;
-    const scheduledSubscribers : Subscriber[] = [] ;
+    const scheduleWatchers : Watcher[] = [] ;
     let waitFunction : WaitFunction;
     const cancelFunctions : CancelFunction[] = [];
     let lastFactor : Decimal | undefined;
@@ -38,8 +39,8 @@ function Factorizer (queryObject : any) {
     function clear () : void {
         globalHalt = true;
         console.debug(`${id}: clearing`);
-        for (const subscriber of scheduledSubscribers) {
-            subscriber.cancel();
+        for (const watcher of scheduleWatchers) {
+            watcher.cancel();
         }
         for (const cancel of cancelFunctions) {
             cancel("halt");
@@ -59,7 +60,7 @@ function Factorizer (queryObject : any) {
         let isFactorResolved = false;
         return new Promise((nextFactorResolve, nextFactorReject) => {
             const key = `${integer.toString()}${factorIndex}`;
-            let lastCheckedNumber;
+            let lastCheckedNumber : Decimal;
             // keep track of the reject functions
             // so we can halt promises abruptly
             // if user input changes--to avoid 
@@ -121,11 +122,10 @@ function Factorizer (queryObject : any) {
                 const { globalMax, intervalLength, globalStartValue, numIntervals } = 
                 computeGlobalValues();
                 const intervalMax = intervalMaxUpperBound(intervalIndex, intervalLength, globalMax);
-                console.log(`WHAT MATTERS`);
                 let i = intervalStartValue(intervalIndex, intervalLength);
                 console.debug(`starting interval ${intervalIndex}; globalStartValue: ${i}; globalMax : ${globalMax}`);
                 
-                if (weHave("i > global max", i.greaterThan(globalMax))) {
+                if (weHave("i >= global max", i.greaterThanOrEqualTo(globalMax))) {
                     weKnowThat("the recursion should end", () => {
                         console.log(`terminating interval: ${intervalIndex}; will return ${quotient}`);
                         we.assert.atLevel("DEBUG").that("quotient is prime", () => isPrime(quotient));
@@ -210,12 +210,12 @@ function Factorizer (queryObject : any) {
                                 });
                             }
                             // end main asynchronous computation function
-                        }, subscriber);
-                        scheduledSubscribers.push(subscriber);
+                        }, watcher);
+                        scheduleWatchers.push(watcher);
                         scheduledObject
                             .then(() => {
-                                const nextIndex = intervalIndex.plus(new Decimal(1));
                                 console.log(`${id} finished testing interval index: ${intervalIndex};`);
+                                const nextIndex = intervalIndex.plus(new Decimal(1));
                                 // computation for the next interval
                                 // is called asynchronously whenever
                                 // computation for the previous interval
@@ -254,10 +254,7 @@ function Factorizer (queryObject : any) {
                         // should always be true. We put a check on this
                         // as a sanity check to avoid potential silent
                         // errors.
-                        if(!we.assert.atLevel("ERROR").that("i > globalMax", i.greaterThan(globalMax))) {
-                            console.error(`i: ${i}; globalMax: ${globalMax}; intervalIndex: ${intervalIndex}`);
-                        }
-                        
+                        we.assert.atLevel("ERROR").that(`i >= globalMax; i : ${i}; globalMax : ${globalMax}`, i.greaterThanOrEqualTo(globalMax))
                         weKnowThat(`no number from 2 up to sqrt(quotient)+1 
                         divides the quotient, so the quotient is prime. Thus
                         the 'next factor' of quotient is quotient`);
@@ -270,7 +267,6 @@ function Factorizer (queryObject : any) {
                     }
                 });
             }
-            console.warn("query", queryObject);
             if (queryObject["worker"] == "false" || worker == undefined || worker == null) {
                 console.log("not using worker");
                 // worker is not available
@@ -361,10 +357,20 @@ function Factorizer (queryObject : any) {
     }
 
     this.factor = function (integer : Decimal, workerIn : Worker, waitFunctionIn : WaitFunction, subscriber : Subscriber) {
-        globalHalt = false;
-        console.log(`${id}: begin factoring integer : ${integer}.`);
-        we.assert.atLevel("ERROR").that(`input ${integer.toString()} is an integer`, integer.floor().equals(integer));
-        let observable;
+        weKnowThat("we are resetting to factor a new inupt value", () => {
+            soWe("reset globalHalt", () => {
+                globalHalt = false;
+            });
+            console.log(`${id}: begin factoring integer : ${integer}.`);
+        });
+        
+        
+        we.assert.atLevel("ERROR").that(`input ${integer.toString()} is an integer`, integer.isInteger());
+
+        let setObservable = (observable : Observable) => {
+            subscriber.observable = observable;
+        };
+
         const factorPromise = new Promise((factorResolve, factorReject) => {
             cancelFunctions.push(factorReject);
             waitFunction = waitFunctionIn;
@@ -375,7 +381,7 @@ function Factorizer (queryObject : any) {
             // observable, that fires the factorRecursion
             // to find the next factor
 
-            observable = new Observable((observer : Observer) => {
+            const observable = new Observable((observer : Observer) => {
                 console.log(`${id} starting factorRecursion`);
                 factorRecursion(integer, integer, observer)
                     .then(() => {
@@ -402,9 +408,13 @@ function Factorizer (queryObject : any) {
                         }
                     });
             });
+            letUs("put the observable Promise<Observable> on the subscriber object", () => {
+                setObservable(observable);
+            });
+            
         });
-        subscriber.observable = observable;
-        Object.assign(subscriber, { observable, clear });
+
+        Object.assign(subscriber, { clear });
         return factorPromise;
     };
     this.factor.getId = () => {

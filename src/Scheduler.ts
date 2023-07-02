@@ -1,5 +1,6 @@
+import { Watcher } from "./Scheduler.d";
 class Scheduler {
-    schedule = (inputCodeBlockFunction : (...args : any[]) => any, subscriber) => {
+    schedule = (inputCodeBlockFunction : (...args : any[]) => any, watcher : Watcher) => {
         let id : ReturnType<typeof setTimeout>;
         return new Promise((resolve, reject) => {
             let isResolved = false;
@@ -25,8 +26,8 @@ class Scheduler {
                     });
                 }
             }, 0);
-            subscriber.id = id;
-            subscriber.cancel = () => {
+            watcher.id = id;
+            watcher.cancel = () => {
                 reject("halt");
                 clearTimeout(id);
             };

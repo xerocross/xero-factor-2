@@ -6,14 +6,19 @@
 // called with new to create new Obsesrvable
 // object
 
-type ObservableEvent = {
-    status : string,
-    payload ?: any
-}
+// type ObservableEvent = {
+//     status : string,
+//     payload ?: any
+// }
 
-type Observer = {
-    next : (event : ObservableEvent) => void
-}
+// type Observer = {
+//     next : (event : ObservableEvent) => void
+// }
+// type Subscriber = { 
+//     cancel : () => void, 
+//     observable : Observable | null
+// };
+import { ObservableEvent } from "./Observable.d";
 
 class Observable {
     private subscriberUpdateFunction : (arg : any) => void = function () {};
@@ -24,7 +29,7 @@ class Observable {
     }
 
     private observer = {
-        next : (event) => {
+        next : (event : ObservableEvent) => {
             this.subscriberUpdateFunction(event);
         }
     };
@@ -43,4 +48,4 @@ class Observable {
         this.subscriberUpdateFunction = () => {};
     };
 }
-export { Observable, ObservableEvent, Observer };
+export { Observable };
