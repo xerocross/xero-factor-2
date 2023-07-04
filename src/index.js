@@ -10,7 +10,7 @@ const queryObject = queryString.parse(locationQueryString);
 try {
     let myWorker;
     if (typeof Worker === "function") {
-        myWorker = new Worker(new URL("./get-factor-worker.js", import.meta.url), {
+        myWorker = new Worker(new URL("./get-factor-worker.ts", import.meta.url), {
             type : "module"
         });
     }

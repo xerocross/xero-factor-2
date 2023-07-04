@@ -39,13 +39,13 @@ class Observable {
     // {...instructions
     // on what to do with incoming events; 
     // }. 
-    subscribe = (subFunction) => {
+    public subscribe = (subFunction) => {
         this.subscriberUpdateFunction = subFunction;
         this.subscribeFunction(this.observer);
     };
 
-    cancel = () => {
+    public cancel = () => {
         this.subscriberUpdateFunction = () => {};
     };
 }
-export { Observable };
+export default Observable;

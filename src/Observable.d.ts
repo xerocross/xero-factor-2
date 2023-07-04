@@ -1,10 +1,10 @@
 export interface Observable {
-    subscribe : (arg: Function) => void
+    subscribe : (arg ?: (observerEvent : ObservableEvent) => void) => void
     cancel : () => void
 }
 export interface ObservableEvent {
     status : string,
-    payload ?: any
+    payload : { [key : string] : any; }
 }
 export interface Observer {
     next : (event : ObservableEvent) => void

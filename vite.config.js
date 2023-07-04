@@ -14,7 +14,7 @@ export default defineConfig({
     },
     build : {
         worker : {
-            entry : "src/get-factor-worker.js",
+            entry : "src/get-factor-worker.ts",
             output : "/"
         }
     }
