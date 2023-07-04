@@ -1,7 +1,7 @@
 import Decimal from "decimal.js";
 import WeAssert from "we-assert";
 import DataIs from "@xerocross/data-is";
-import { check, since, weKnowThat, given, letUs, weHave } from "@xerocross/literate";
+import { check, since, weKnowThat, given, letUs, weHave, weHaveThat } from "@xerocross/literate";
 import Scheduler from "./Scheduler";
 
 const { D } 
@@ -25,7 +25,7 @@ const FactorRequestHandler = function () {
     });
 
 
-    let factorEvents = {};
+    const factorEvents = {};
     this.post = function (event) {
         console.debug("called FactorRequestHandler:post");
         // event = {
@@ -38,7 +38,7 @@ const FactorRequestHandler = function () {
         // }
         
         function findNextFactor (globalFirst, quotient, isHalt) {
-            let lastIntegerTested;
+            let lastIntegerTested : Decimal;
             let foundNextFactor = false;
             console.log(`doComputation: ${quotient}.`);
             const { globalMax, intervalLength} 
@@ -78,8 +78,8 @@ const FactorRequestHandler = function () {
                                     for (; i.lessThan(subintervalMax); i = i.plus(D(1))) {
                                         we.assert.atLevel("ERROR").that("after i = globalFirst, then i = lastIntegerTested + 1", i == globalFirst || lastIntegerTested.plus(D(1)).equals(i));
                                         
-                                        let iDividesQuotient = quotient.modulo(i).equals(0);
-                                        if (check("i is a factor of quotient", iDividesQuotient)) {
+                                        const iDividesQuotient = quotient.modulo(i).equals(0);
+                                        if (weHaveThat("i is a factor of quotient", iDividesQuotient)) {
                                             letUs("send i back as first factor", () => {
                                                 resolve({status : "factor", payload : {"factor" : i.toString() }});
                                                 foundNextFactor = true;
@@ -98,11 +98,11 @@ const FactorRequestHandler = function () {
                                 });
                                 if (check("factoring has been halted", isHalt())) {
                                     weKnowThat("that the factor request has received a halt request");
-                                    console.debug(`successfully halted: ${event.data.payload.integer}`);
+                                    console.debug(`successfully halted: ${event.payload.integer}`);
                                     since("the factoring function is not recursing", () => {
                                         letUs(`post message to main thread confirming halt for the current integer`, () => {
                                             const { integer } 
-                                            = {"integer" : event.data.payload.integer };
+                                            = {"integer" : event.payload.integer };
                                             resolve({
                                                 status : "halted",
                                                 payload : {
@@ -132,7 +132,7 @@ const FactorRequestHandler = function () {
             });
         }
         
-        if (weHave("the main thread posted a next factor request", event.data.status === "factor")) {
+        if (weHave("the main thread posted a next factor request", event.status === "factor")) {
             const { isHalt } = 
             letUs("set up halt function for this integer factoring", () => {
                 let halt = false;
@@ -142,7 +142,7 @@ const FactorRequestHandler = function () {
                 const isHalt = () => {
                     return halt;
                 };
-                factorEvents[event.data.payload.integer] = {
+                factorEvents[event.payload.integer] = {
                     halt : haltFunction
                 };
                 return { isHalt };
@@ -150,25 +150,25 @@ const FactorRequestHandler = function () {
             let quotient, initialValue;
             try {
                 ({quotient, initialValue} 
-                = letUs("setup values for interval computation", () => {
-                    we.assert.atLevel("DEBUG").that(data(event.data.payload.quotient).is.a("positive integer"));
-                    let quotient = D(event.data.payload.quotient);
-                    let { lastFactor } 
-                    = since("there is no need to check values smaller than the last factor", () => {
-                        return letUs("validate and handle the last factor if sent by the main thread", () => {
-                            let lastFactor;
-                            if (event.data.payload.lastFactor === "") {
-                                lastFactor = D(1);
-                            } else {
-                                we.assert.atLevel("ERROR").that(data(event.data.payload.lastFactor).is.a("positive integer"));
-                                lastFactor = D(event.data.payload.lastFactor);
-                            }
-                            return { lastFactor };
+                    = letUs("setup values for interval computation", () => {
+                        we.assert.atLevel("DEBUG").that("quotient is a pos integer", data(event.payload.quotient).is.a("positive integer"));
+                        let quotient = D(event.payload.quotient);
+                        let { lastFactor } 
+                        = since("there is no need to check values smaller than the last factor", () => {
+                            return letUs("validate and handle the last factor if sent by the main thread", () => {
+                                let lastFactor;
+                                if (event.payload.lastFactor === "") {
+                                    lastFactor = D(1);
+                                } else {
+                                    we.assert.atLevel("ERROR").that("lastFactor is a pos integer", data(event.payload.lastFactor).is.a("positive integer"));
+                                    lastFactor = D(event.payload.lastFactor);
+                                }
+                                return { lastFactor };
+                            });
                         });
-                    });
-                    let initialValue = Decimal.max(D(2), lastFactor);
-                    return {quotient, initialValue};
-                }));
+                        let initialValue = Decimal.max(D(2), lastFactor);
+                        return {quotient, initialValue};
+                    }));
             } catch (e) {
                 return since("we encountered an error during the basic setup of the computation", () => {
                     return letUs("return the error to the main thread", () => {
@@ -188,12 +188,12 @@ const FactorRequestHandler = function () {
                 return findNextFactor(initialValue, quotient, isHalt)
                     .then(
                         since("next factor computation is finished", () => {
-                            return letUs("send next factor result back to main thread", () => {
+                            return letUs("send next factor results back", () => {
                                 return (result) => {
                                     return {
                                         status : result.status,
                                         payload : result.payload,
-                                        key : event.data.key
+                                        key : event.key
                                     };
                                 };
                             });
@@ -204,35 +204,35 @@ const FactorRequestHandler = function () {
                             return {
                                 "status" : "halted",
                                 "payload" : {
-                                    "integer" : event.data.payload.integer
+                                    "integer" : event.payload.integer
                                     
                                 },
-                                "key" : event.data.key
+                                "key" : event.key
                             };
                         } else {
                             return {
                                 "status" : "error",
                                 "payload" : {
                                     "error" : e,
-                                    "integer" : event.data.payload.integer
+                                    "integer" : event.payload.integer
                                 },
-                                "key" : event.data.key
+                                "key" : event.key
                             };
                         }
                     });
             });
-        } else if (weHave("the main thread sent a halt request", event.data.status === "halt")) {
-            console.debug(`received request to halt ${event.data.payload.integer}; attempting`);
-            given("the handler has received a request to halt", factorEvents[event.data.payload.integer], () => {
-                console.debug(`ATTEMPTING TO HALT ${event.data.payload.integer}`);
+        } else if (weHave("the caller sent a halt request", event.status === "halt")) {
+            console.debug(`received request to halt ${event.payload.integer}; attempting`);
+            given("the handler has received a request to halt", factorEvents[event.payload.integer]).then(() => {
+                console.debug(`ATTEMPTING TO HALT ${event.payload.integer}`);
                 letUs("execute a halt function to stop factoring", () => {
-                    factorEvents[event.data.payload.integer].halt();
+                    factorEvents[event.payload.integer].halt();
                 });
             });
             return Promise.resolve({
                 status : "received halt request",
                 payload : {
-                    "integer" : event.data.payload.integer
+                    "integer" : event.payload.integer
                 }
             });
         } else {
