@@ -3,40 +3,47 @@ import WeAssert from "we-assert";
 import DataIs from "@xerocross/data-is";
 import { check, since, weKnowThat, given, letUs, weHave, weHaveThat } from "@xerocross/literate";
 import Scheduler from "./Scheduler";
+import type { FactoringEvent } from "./Factorizer";
 
 const { D } 
-= letUs("define Decimal alias", () => {
-    const D = (x) => {
-        return new Decimal(x);
-    };
-    return  { D };
-});
-
-const FactorRequestHandler = function () {
-    const we = WeAssert.build();
-    const data = DataIs.build();
-    data.define.type("positive integer", (x) => {
-        try {
-            const pattern = /^\d+$/;
-            return pattern.test(x);
-        } catch (e) {
-            return false;
-        }
+    = letUs("define Decimal alias", () => {
+        const D = (x : string) => {
+            return new Decimal(x);
+        };
+        return  { D };
     });
 
+    interface NextFactorResult {
+        status : string,
+        payload : {
+            [key : string] : any
+        },
+        key : string
+    }
 
-    const factorEvents = {};
-    this.post = function (event) {
-        console.debug("called FactorRequestHandler:post");
-        // event = {
-        //     status : "factor",
-        //     payload : {
-        //         integer : "[integer]",
-        //         lastFactor : "[lastFactor]",
-        //         quotient : "[quotient]"
-        //     }
-        // }
+class NextFactorRequestHandler {
+    
+    public constructor () {
+        this.data = DataIs.build();
+        this.we = WeAssert.build();
         
+        this.data.define.type("positive integer", (x) => {
+            try {
+                const pattern = /^[1-9]+\d*$/;
+                return pattern.test(x);
+            } catch (e) {
+                return false;
+            }
+        });
+    }
+    private we;
+    private data;
+    private isReceivedHaltRequest : boolean;
+
+
+    public post (event : FactoringEvent) {
+        console.debug("called FactorRequestHandler:post");
+
         function findNextFactor (globalFirst : Decimal, quotient : Decimal, isHalt : () => boolean) {
             let lastIntegerTested : Decimal;
             let foundNextFactor = false;
@@ -57,7 +64,7 @@ const FactorRequestHandler = function () {
                 return { globalMax, intervalLength};
             });
             
-            function computeSubinterval (quotient, initialValueOfSubinterval, subintervalMax, intervalLength) {
+            function computeSubinterval (quotient : Decimal, initialValueOfSubinterval : Decimal, subintervalMax : Decimal, intervalLength : Decimal) {
                 console.debug(`computeSubinterval quotient: ${quotient}; start: ${initialValueOfSubinterval}; end: ${subintervalMax}; intervalLength: ${intervalLength}; globalMax: ${globalMax}`);
                 return new Promise((resolve) => {
                     let i = initialValueOfSubinterval;
@@ -76,7 +83,7 @@ const FactorRequestHandler = function () {
                             new Scheduler().schedule(() => {
                                 letUs("find the smallest i in the subinterval, if any, that divides the quotient", () => {
                                     for (; i.lessThan(subintervalMax); i = i.plus(D(1))) {
-                                        we.assert.atLevel("ERROR").that("after i = globalFirst, then i = lastIntegerTested + 1", i == globalFirst || lastIntegerTested.plus(D(1)).equals(i));
+                                        this.we.assert.atLevel("ERROR").that("after i = globalFirst, then i = lastIntegerTested + 1", i == globalFirst || lastIntegerTested.plus(D(1)).equals(i));
                                         
                                         const iDividesQuotient = quotient.modulo(i).equals(0);
                                         if (weHaveThat("i is a factor of quotient", iDividesQuotient)) {
@@ -132,41 +139,28 @@ const FactorRequestHandler = function () {
             });
         }
         
-        if (weHave("the main thread posted a next factor request", event.status === "factor")) {
-            const { isHalt } = 
-            letUs("set up halt function for this integer factoring", () => {
-                let halt = false;
-                const haltFunction = () => {
-                    halt = true;
-                };
-                const isHalt = () => {
-                    return halt;
-                };
-                factorEvents[event.payload.integer] = {
-                    halt : haltFunction
-                };
-                return { isHalt };
-            });
-            let quotient, initialValue;
+        if (weHave("the caller posted a next factor request", event.status == "factor")) {
+            this.isReceivedHaltRequest = false;
+            let quotient : Decimal, initialValue : Decimal;
             try {
                 ({quotient, initialValue} 
                     = letUs("setup values for interval computation", () => {
-                        we.assert.atLevel("DEBUG").that("quotient is a pos integer", data(event.payload.quotient).is.a("positive integer"));
-                        let quotient = D(event.payload.quotient);
-                        let { lastFactor } 
+                        this.we.assert.atLevel("DEBUG").that("quotient is a pos integer", this.data(event.payload.quotient).is.a("positive integer"));
+                        const quotient = D(event.payload.quotient);
+                        const { lastFactor } 
                         = since("there is no need to check values smaller than the last factor", () => {
                             return letUs("validate and handle the last factor if sent by the main thread", () => {
-                                let lastFactor;
-                                if (event.payload.lastFactor === "") {
+                                let lastFactor : Decimal;
+                                if (event.payload.lastFactor == "") {
                                     lastFactor = D(1);
                                 } else {
-                                    we.assert.atLevel("ERROR").that("lastFactor is a pos integer", data(event.payload.lastFactor).is.a("positive integer"));
+                                    this.we.assert.atLevel("ERROR").that("lastFactor is a pos integer", data(event.payload.lastFactor).is.a("positive integer"));
                                     lastFactor = D(event.payload.lastFactor);
                                 }
                                 return { lastFactor };
                             });
                         });
-                        let initialValue = Decimal.max(D(2), lastFactor);
+                        const initialValue = Decimal.max(D(2), lastFactor);
                         return {quotient, initialValue};
                     }));
             } catch (e) {
@@ -185,7 +179,7 @@ const FactorRequestHandler = function () {
 
             console.log(`starting doComputation`);
             return letUs("start executing computation recursion", () => {
-                return findNextFactor(initialValue, quotient, isHalt)
+                return findNextFactor(initialValue, quotient, () => this.isReceivedHaltRequest )
                     .then(
                         since("next factor computation is finished", () => {
                             return letUs("send next factor results back", () => {
@@ -200,7 +194,7 @@ const FactorRequestHandler = function () {
                         })
                     )
                     .catch((e) => {
-                        if (weHave("exception was a halt request, not an error", e === "halt")) {
+                        if (weHave("exception was a halt request, not an error", e == "halt")) {
                             return {
                                 "status" : "halted",
                                 "payload" : {
@@ -241,4 +235,4 @@ const FactorRequestHandler = function () {
         }
     };
 };
-export default FactorRequestHandler;
+export default NextFactorRequestHandler;

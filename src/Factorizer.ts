@@ -4,10 +4,32 @@ import { Decimal } from "decimal.js";
 import { Watcher } from "./Scheduler.d";
 import WeAssert from "we-assert";
 import { v4 as uuidv4 } from "uuid";
-import FactorRequestHandler from "./FactorRequestHandler";
+import FactorRequestHandler from "./NextFactorRequestHandler";
 import { check, since, weKnowThat, letUs, weHave, soWe, so, weHaveThat } from "@xerocross/literate";
 import type { WaitFunction } from "./WaitFunction.d.ts";
+import type { QueryObject } from "./QueryObject";
 type CancelFunction = (command : string) => void;
+
+
+
+class FactoringWorkObject {
+    
+    constructor(id : string, primaryInteger: Decimal) {
+        this.id = id;
+        this.primaryInteger = primaryInteger;
+    }
+    public id : string;
+    public primaryInteger : Decimal;
+    public factors : Decimal[];
+    public currentQuotient : Decimal;
+
+    setCurrentQuotient (currentQuotient : Decimal) {
+        this.currentQuotient = currentQuotient;
+    }
+    getFactors () {
+        return this.factors;
+    }
+}
 
 
 const { D } 
@@ -17,37 +39,52 @@ const { D }
     };
     return  { D };
 });
+Decimal.set({ precision : 64 });
 
-function Factorizer (queryObject : any, worker : Worker) {
-    const factorRequestHandler = new FactorRequestHandler();
-    Decimal.set({ precision : 64 });
-    const id = uuidv4().substring(0, 8);
-    let factorIndex : number;
+class Factorizer {
+
+    constructor(queryObject : any, worker : Worker) {
+        this.queryObject = queryObject;
+        this.worker = worker;
+        this.id = uuidv4().substring(0, 8);
+        this.factorRequestHandler = new FactorRequestHandler();
+        this.we = WeAssert.build();
+        this.we.setLevel("ERROR");
+        this.we.setHandler((message : string) => {
+            throw new Error(`${this.id}: The following assertion failed: ${message}`);
+        });
+    }
+    // newly organized
+    private we;
+    private id : string;
+    private queryObject : QueryObject;
+    private worker : Worker;
+    private factorRequestHandler : typeof FactorRequestHandler;
+    // prior
+    
+    private factorIndex : number;
     const scheduleWatchers : Watcher[] = [] ;
-    let waitFunction : WaitFunction;
-    const cancelFunctions : CancelFunction[] = [];
-    let lastFactor : Decimal | undefined;
-    const we = WeAssert.build();
-    let globalHalt = false;
-    let ongoingFactoring = {};
+    private waitFunction : WaitFunction;
+    //const cancelFunctions : CancelFunction[] = [];
+    //private lastFactor : Decimal | undefined;
+    //private globalHalt = false;
+    //private ongoingFactoring = {};
 
-    we.setLevel("ERROR");
-    we.setHandler((message) => {
-        throw new Error(`${id}: The following assertion failed: ${message}`);
-    });
+    
 
     // will be exported
-    function clear () : void {
-        globalHalt = true;
-        console.debug(`${id}: clearing`);
-        for (const watcher of scheduleWatchers) {
-            watcher.cancel();
-        }
-        for (const cancel of cancelFunctions) {
-            cancel("halt");
-        }
-        lastFactor = undefined;
-    }
+    // clear is deprecated
+    // private clear = () : void => {
+    //     globalHalt = true;
+    //     console.debug(`${id}: clearing`);
+    //     for (const watcher of scheduleWatchers) {
+    //         watcher.cancel();
+    //     }
+    //     for (const cancel of cancelFunctions) {
+    //         cancel("halt");
+    //     }
+    //     lastFactor = undefined;
+    // }
 
     // getNextFactor breaks up the work of finding
     // the next factor into asynchronous smaller calculations
@@ -55,12 +92,16 @@ function Factorizer (queryObject : any, worker : Worker) {
     // size of the input quotient.
     // The point of this is to allow for greater responsivenss
     // in the browser even for computations with large numbers.
-    function getNextFactor (integer : Decimal, quotient : Decimal, observer) : Promise<Decimal> {
-        console.debug(`${id}: finding next factor of ${quotient}`);
-        we.assert.atLevel("ERROR").that("quotient is an integer", quotient.isInteger());
+    private getNextFactor = (factoringWorkObject: FactoringWorkObject) : Promise<Decimal> => {
+        let quotient = factoringWorkObject.currentQuotient;
+        let integer = factoringWorkObject.primaryInteger;
+        let factorIndex = factoringWorkObject.getFactors().length;
+        
+        console.debug(`${this.id}: finding next factor of ${quotient}`);
+        this.we.assert.atLevel("ERROR").that("quotient is an integer", quotient.isInteger());
         return new Promise((nextFactorResolve) => {
             const key = `${integer.toString()}${factorIndex}`;
-            if (queryObject["worker"] == "false" || worker == undefined || worker == null) {
+            if (this.queryObject["worker"] == "false" || this.worker == undefined || this.worker == null) {
                 console.log("not using worker");
                 // worker is not available
                 
@@ -78,7 +119,7 @@ function Factorizer (queryObject : any, worker : Worker) {
                 // Obviously web workers are preferred, and
                 // if they are available on the browser, then
                 // we use them
-                factorRequestHandler.post({
+                this.factorRequestHandler.post({
                     "status" : "factor",
                     "payload" : {
                         "quotient" : quotient.toString(),
@@ -107,7 +148,7 @@ function Factorizer (queryObject : any, worker : Worker) {
                     });
             } else {
                 console.debug(`${id} using worker`);
-                worker.onmessage = function (e) {
+                this.worker.onmessage = function (e) {
                     if (e.data.status == "factor" && e.data.key == key) {
                         console.debug(`${id} worker sent message: next factor : ${e.data.payload.factor}; key : ${e.data.key}`);
                         nextFactorResolve(new Decimal(e.data.payload.factor));
@@ -122,7 +163,7 @@ function Factorizer (queryObject : any, worker : Worker) {
                         console.debug(`worker encountered an error`, e.data.payload.error);
                     }
                 };
-                worker.postMessage({
+                this.worker.postMessage({
                     "status" : "factor",
                     "payload" : {
                         "quotient" : quotient.toString(),
