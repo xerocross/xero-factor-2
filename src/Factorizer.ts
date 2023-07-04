@@ -18,11 +18,10 @@ const { D }
     return  { D };
 });
 
-function Factorizer (queryObject : any) {
+function Factorizer (queryObject : any, worker : Worker) {
     const factorRequestHandler = new FactorRequestHandler();
     Decimal.set({ precision : 64 });
     const id = uuidv4().substring(0, 8);
-    let worker : Worker;
     let factorIndex : number;
     const scheduleWatchers : Watcher[] = [] ;
     let waitFunction : WaitFunction;
@@ -30,6 +29,8 @@ function Factorizer (queryObject : any) {
     let lastFactor : Decimal | undefined;
     const we = WeAssert.build();
     let globalHalt = false;
+    let ongoingFactoring = {};
+
     we.setLevel("ERROR");
     we.setHandler((message) => {
         throw new Error(`${id}: The following assertion failed: ${message}`);
@@ -175,6 +176,7 @@ function Factorizer (queryObject : any) {
     }
 
     this.factor = function (integer : Decimal, workerIn : Worker, waitFunctionIn : WaitFunction, subscriber : Subscriber) {
+        const factorId = uuidv4();
         weKnowThat("we are resetting to factor a new inupt value", () => {
             soWe("reset globalHalt", () => {
                 globalHalt = false;
@@ -194,7 +196,6 @@ function Factorizer (queryObject : any) {
         const factorPromise = new Promise((factorResolve, factorReject) => {
             cancelFunctions.push(factorReject);
             waitFunction = waitFunctionIn;
-            worker = workerIn;
             factorIndex =
                 letUs("keep track of which factor we are computing", () => {
                     return 0;
@@ -236,12 +237,21 @@ function Factorizer (queryObject : any) {
             });
             
         });
-
-        Object.assign(subscriber, { clear });
+        ongoingFactoring[factorId] = { "integer" : integer };
+        Object.assign(subscriber, { clear, factorId });
         return factorPromise;
     };
     this.factor.getId = () => {
         return id;
+    };
+    
+    this.halt = () => {
+        this.FactorRequestHandler.post({
+            "status" : "halt",
+            "payload" : {
+                "integer" : this.lastInteger.toString()
+            }
+        });
     };
 }
 export default Factorizer;

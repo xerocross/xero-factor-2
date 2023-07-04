@@ -37,7 +37,7 @@ const FactorRequestHandler = function () {
         //     }
         // }
         
-        function findNextFactor (globalFirst, quotient, isHalt) {
+        function findNextFactor (globalFirst : Decimal, quotient : Decimal, isHalt : () => boolean) {
             let lastIntegerTested : Decimal;
             let foundNextFactor = false;
             console.log(`doComputation: ${quotient}.`);
