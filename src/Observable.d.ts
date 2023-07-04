@@ -1,5 +1,5 @@
 export interface Observable {
-    subscribe : (arg: Function) => void
+    subscribe : (arg ?: (observerEvent : ObservableEvent) => void) => void
     cancel : () => void
 }
 export interface ObservableEvent {

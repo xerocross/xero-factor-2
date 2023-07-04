@@ -68,14 +68,25 @@
         </div>
     </div>
 </template>
-<script>
+<script lang="ts">
+import { defineComponent } from "vue";
 import Debounce from "lodash.debounce";
 import { Decimal } from "decimal.js";
 import Factorizer from "../Factorizer";
+import type { Observable, ObservableEvent } from "../Observable.d";
+import { check, since, weKnowThat, letUs, weHave, soWe, so, weHaveThat } from "@xerocross/literate";
 
 Decimal.set({ precision : 64 });
 
-export default {
+type IntegerInput = ((arg1 : string, arg2 : string) => void);
+
+interface Factor {
+    value : Decimal,
+    string : string,
+    key : number
+}
+
+export default defineComponent({
     props : {
         worker : {
             default : null
@@ -102,7 +113,7 @@ export default {
         return {
             integerInput : "2",
             lastInteger : undefined,
-            factors : [],
+            factors : [] as Factor[],
             observables : [],
             integer : new Decimal(2),
             isWorking : false,
@@ -154,7 +165,7 @@ export default {
             this.invalidInput = !check;
             if (!check)
                 console.log(`invalidInput: ${this.invalidInput}`);
-        }, 100)
+        }, 100) as IntegerInput
     },
     mounted () {
         this.animateWaiting();
@@ -167,15 +178,15 @@ export default {
         this.pushHistory(`component mounted`);
     },
     methods : {
-        checkValidInput (input) {
+        checkValidInput (input : string) {
             this.pushHistory(`checking validity of input: ${input}`);
-            let test;
+            let isInputValid : boolean;
             if (input.length == 0) {
-                test = false;
+                isInputValid = false;
             }
-            let pattern = new RegExp(/^\d+$/);
+            let pattern = new RegExp(/^[1-9]\d*$/);
             let match = pattern.exec(input);
-            let parsedDec;
+            let parsedDec : Decimal;
             let isGreaterThan1 = false;
             try {
                 parsedDec = new Decimal(input);
@@ -183,16 +194,15 @@ export default {
             } catch (e) {
                 console.error("input could not be parsed as a decimal");
             }
-            if (match !== null && match[0] === input && isGreaterThan1) {
-                test = true;
+            if (match !== null && match[0] == input && isGreaterThan1) {
+                isInputValid = true;
             } else {
-                test = false;
+                isInputValid = false;
             }
-            return test;
+            return isInputValid;
         },
         animateWaiting () {
             let div = this.$refs.working;
-            window.x = this;
             setInterval(function () {
                 div.style.color = "green";
                 setTimeout(function () {
@@ -202,7 +212,9 @@ export default {
         },
         halt () {
             console.trace();
+            console.warn("tracing clear factorize");
             if (this.clearFactorize) {
+                console.warn("clear factorize found");
                 this.clearFactorize();
                 this.clearFactorize = undefined;
             }
@@ -256,23 +268,22 @@ export default {
                 currentActivity: ${this.currentActivity};
                 `;
         },
-        pushFactor (val) {
-            console.debug(`found factor: ${val}`);
-            let floor = val.floor();
-            if (!val.equals(floor)) {
+        pushFactor (factor : Decimal) {
+            console.debug(`found factor: ${factor}`);
+            if (!factor.isInteger()) {
                 this.logState();
                 this.isError = true;
-                throw new Error(`attempted to push non-integer factor ${val}`);
+                throw new Error(`attempted to push non-integer factor ${factor}`);
             }
-            this.pushHistory(`pushing new factor ${val} for integer ${this.integer}.`);
+            this.pushHistory(`pushing new factor ${factor} for integer ${this.integer}.`);
             this.factors.push({
-                value : val,
-                string : val.toString(),
+                value : factor,
+                string : factor.toString(),
                 key : this.factorIndex
             });
             this.factorIndex++;
         },
-        pushHistory (currentActivity) {
+        pushHistory (currentActivity : string) {
             this.currentActivity = currentActivity;
             this.history.push(this.getStateString());
         },
@@ -306,14 +317,31 @@ export default {
             return (product.equals(this.integer));
         },
         factor () {
+            interface Subscriber {
+                observable : Observable,
+                clear ?: () => void
+            }
             this.factorize = new Factorizer(this.queryObject).factor;
             this.pushHistory(`Started factoring ${this.integer}.`);
             this.beginningWork();
             console.debug("factoring");
             this.$emit("BeginWorking");
             this.isWorking = true;
-            const subscriber = {};
-            let waitFunction = (infun) => {
+            
+            const subscriber : Subscriber =
+            letUs(`create a dummy subscriber object to be filled in 
+            (that is, mutated) by the factorize function`, () => {
+                return {
+                    observable : {
+                        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                        subscribe : (subFun) => {
+                            console.error("the subscriber object was not properly mutated");
+                        },
+                        cancel : () => {}
+                    } as Observable
+                };
+            });
+            let waitFunction = (infun : ((...args : any[]) => void)) => {
                 return new Promise((resolve) => {
                     this.$nextTick(() => {
                         window.requestAnimationFrame(() => {
@@ -323,9 +351,9 @@ export default {
                 });
             };
             const factorPromise = this.factorize(this.integer, this.worker, waitFunction, subscriber);
+            console.warn("by now the clearFactorizer function should be defined:", subscriber.clear);
             this.clearFactorize = subscriber.clear;
-
-            subscriber.observable.subscribe((event) => {
+            subscriber.observable.subscribe((event : ObservableEvent) => {
                 const status = event.status;
                 switch (status) {
                     case "working":
@@ -358,7 +386,7 @@ export default {
             return factorPromise;
         }
     }
-};
+});
 </script>
 <style lang="scss">
 .factor-widget {

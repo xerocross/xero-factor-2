@@ -1,8 +1,8 @@
 
-import FactorRequestHandler from "./FactorRequestHandler.js";
+import FactorRequestHandler from "./FactorRequestHandler";
 const factorRequestHandler = new FactorRequestHandler();
 self.addEventListener("message", function (event) {
-    factorRequestHandler.post(event)
+    factorRequestHandler.post(event.data)
         .then((resultEvent) => {
             self.postMessage(resultEvent);
         })
