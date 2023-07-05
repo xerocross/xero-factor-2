@@ -215,7 +215,7 @@ class Factorizer {
             console.debug(`${id} halted`);
             return;
         }
-    }
+    };
 
     public factor = (integer : Decimal, workerIn : Worker, waitFunctionIn : WaitFunction, subscriber : Subscriber) => {
         const factorId = uuidv4();
