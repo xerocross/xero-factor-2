@@ -18,7 +18,8 @@ export interface FactoringEvent {
         integer ?: string,
         lastFactor ?: string,
         quotient ?: string
-     }
+     },
+     key : string
 }
 export interface FactoringWorkObject {
     id : string;

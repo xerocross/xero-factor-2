@@ -3,7 +3,7 @@ import WeAssert from "we-assert";
 import DataIs from "@xerocross/data-is";
 import { check, since, weKnowThat, given, letUs, weHave, weHaveThat } from "@xerocross/literate";
 import Scheduler from "./Scheduler";
-import type { FactoringEvent } from "./Factorizer";
+import type { FactoringEvent } from "./Factorizer.d";
 
 const { D } 
     = letUs("define Decimal alias", () => {
@@ -154,7 +154,7 @@ class NextFactorRequestHandler {
                                 if (event.payload.lastFactor == "") {
                                     lastFactor = D(1);
                                 } else {
-                                    this.we.assert.atLevel("ERROR").that("lastFactor is a pos integer", data(event.payload.lastFactor).is.a("positive integer"));
+                                    this.we.assert.atLevel("ERROR").that("lastFactor is a pos integer", this.data(event.payload.lastFactor).is.a("positive integer"));
                                     lastFactor = D(event.payload.lastFactor);
                                 }
                                 return { lastFactor };
@@ -165,7 +165,7 @@ class NextFactorRequestHandler {
                     }));
             } catch (e) {
                 return since("we encountered an error during the basic setup of the computation", () => {
-                    return letUs("return the error to the main thread", () => {
+                    return letUs("return the error to the caller", () => {
                         return Promise.resolve({
                             "status" : "error",
                             "payload" : {
@@ -183,7 +183,7 @@ class NextFactorRequestHandler {
                     .then(
                         since("next factor computation is finished", () => {
                             return letUs("send next factor results back", () => {
-                                return (result) => {
+                                return (result : NextFactorResult) => {
                                     return {
                                         status : result.status,
                                         payload : result.payload,
