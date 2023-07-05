@@ -6,6 +6,10 @@ Xero-Factor-2 is a complete rewrite and reimagining of my older widget Xerocross
 
 From a user's perspective, I consider Xero-Factor-2 version 2 of Xerocross.factor because they are almost identical from the user's perspective.
 
+## Transition to TypeScript
+
+I'm currently trying to refactor this app completely to use TypeScript. I realize nobody is terribly interested in apps for factoring primes, but I am hoping to write some code that represents me, and I want to do it for practice. That is currently in progress. I am having some trouble with combining Vue with TypeScript, so we'll see how it goes. (written July 5, 2023).
+
 ## Technology
 
 This is a Vue 3 project. It's so simple there was no need for any special tools to manage state. I have used decimal.js for handling large numbers.
