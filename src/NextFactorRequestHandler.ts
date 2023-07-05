@@ -1,7 +1,7 @@
 import Decimal from "decimal.js";
 import WeAssert from "we-assert";
 import DataIs from "@xerocross/data-is";
-import { check, since, weKnowThat, given, letUs, weHave, weHaveThat } from "@xerocross/literate";
+import { check, since, weKnowThat, letUs, weHave, weHaveThat } from "@xerocross/literate";
 import Scheduler from "./Scheduler";
 import type { FactoringEvent } from "./Factorizer.d";
 
@@ -23,11 +23,11 @@ const { D }
 
 class NextFactorRequestHandler {
     
-    public constructor () {
+    public constructor (integer : Decimal) {
         this.data = DataIs.build();
         this.we = WeAssert.build();
-        
-        this.data.define.type("positive integer", (x) => {
+        this.integer = integer;
+        this.data.define.type("positive integer", (x : any) => {
             try {
                 const pattern = /^[1-9]+\d*$/;
                 return pattern.test(x);
@@ -39,105 +39,109 @@ class NextFactorRequestHandler {
     private we;
     private data;
     private isReceivedHaltRequest : boolean;
+    private integer : Decimal;
+
+
+    private findNextFactor (globalFirst : Decimal, quotient : Decimal) {
+        let lastIntegerTested : Decimal;
+        let foundNextFactor = false;
+        console.log(`doComputation: ${quotient}.`);
+        const { globalMax, intervalLength} 
+        = letUs("compute some initial values for the computation", () => {
+            const squareRoot = quotient.squareRoot();
+            const globalMax = squareRoot.ceil().plus(D(1));
+            weKnowThat("mathematically, the smallest factor of quotient is < globalMax");
+            /*
+            * For large numbers, we divide the work up into subintervals so that
+            * there will be at most 1000 subintervals before finding the next factor.
+            * If the total number of possible divisors we have to check is small
+            *  (< 1000) then we default to using just one interval of length 1000.
+            */
+            const totalComputationLength = globalMax.minus(globalFirst);
+            const intervalLength = Decimal.max(totalComputationLength.div(D(1000)).floor(), D(1000));
+            return { globalMax, intervalLength};
+        });
+        
+        function computeSubinterval (quotient : Decimal, initialValueOfSubinterval : Decimal, subintervalMax : Decimal, intervalLength : Decimal) {
+            console.debug(`computeSubinterval quotient: ${quotient}; start: ${initialValueOfSubinterval}; end: ${subintervalMax}; intervalLength: ${intervalLength}; globalMax: ${globalMax}`);
+            return new Promise((resolve) => {
+                let i = initialValueOfSubinterval;
+                if (weHave("i >= global max", i.greaterThanOrEqualTo(globalMax))) {
+                    console.debug(`found i:${i} >= globalMax:${globalMax}`);
+                    weKnowThat(`no divisor of quotient has been found from
+                    start until max, which implies that quotient is prime`);
+                    since("quotient is prime", () => {
+                        letUs("return that the only factor of quotient is quotient", () => {
+                            resolve({status : "factor", payload : {"factor" : quotient.toString() }});
+                            foundNextFactor = true;
+                        });
+                    });
+                } else {
+                    letUs("schedule the main division computation for this subinterval", () => {
+                        new Scheduler().schedule(() => {
+                            letUs("find the smallest i in the subinterval, if any, that divides the quotient", () => {
+                                for (; i.lessThan(subintervalMax); i = i.plus(D(1))) {
+                                    this.we.assert.atLevel("ERROR").that("after i = globalFirst, then i = lastIntegerTested + 1", i == globalFirst || lastIntegerTested.plus(D(1)).equals(i));
+                                    
+                                    const iDividesQuotient = quotient.modulo(i).equals(0);
+                                    if (weHaveThat("i is a factor of quotient", iDividesQuotient)) {
+                                        letUs("send i back as first factor", () => {
+                                            resolve({status : "factor", payload : {"factor" : i.toString() }});
+                                            foundNextFactor = true;
+                                            lastIntegerTested = i;
+                                        });
+                                        break;
+                                    }
+
+                                    since("we want to make sure we don't accidentally skip any number", () => {
+                                        letUs("keep track of this number for comparison in the next iteration", () => {
+                                            lastIntegerTested = i;
+                                        });
+                                        
+                                    });
+                                }
+                            });
+                            if (weHaveThat("factoring has been halted", this.isReceivedHaltRequest)) {
+                                weKnowThat("that the factor request has received a halt request");
+                                console.debug(`successfully halted: ${this.integer}`);
+                                since("the factoring function is not recursing", () => {
+                                    letUs(`post message to main thread confirming halt for the current integer`, () => {
+                                        const { integer } 
+                                        = {"integer" : this.integer };
+                                        resolve({
+                                            status : "halted",
+                                            payload : {
+                                                "message" : `successfully halted: ${integer}`,
+                                                "integer" : integer
+                                            }
+                                        });
+                                    });
+                                });
+                            } else {
+                                weKnowThat("factoring has not been halted");
+                                if (check("the next factor has not been found", !foundNextFactor)) {
+                                    since("factoring needs to continue", () => {
+                                        letUs("recurse down to continue to the next subinterval", () => {
+                                            resolve(computeSubinterval(quotient, subintervalMax, subintervalMax.plus(intervalLength), intervalLength));
+                                        });
+                                    });
+                                }
+                            }
+                        }, {});
+                    });
+                }
+            });
+        }
+        return letUs("kick off computation to find the first factor", () => {
+            return computeSubinterval(quotient, globalFirst, globalFirst.plus(intervalLength), intervalLength);
+        });
+    }
 
 
     public post (event : FactoringEvent) {
         console.debug("called FactorRequestHandler:post");
 
-        function findNextFactor (globalFirst : Decimal, quotient : Decimal, isHalt : () => boolean) {
-            let lastIntegerTested : Decimal;
-            let foundNextFactor = false;
-            console.log(`doComputation: ${quotient}.`);
-            const { globalMax, intervalLength} 
-            = letUs("compute some initial values for the computation", () => {
-                const squareRoot = quotient.squareRoot();
-                const globalMax = squareRoot.ceil().plus(D(1));
-                weKnowThat("mathematically, the smallest factor of quotient is < globalMax");
-                /*
-                * For large numbers, we divide the work up into subintervals so that
-                * there will be at most 1000 subintervals before finding the next factor.
-                * If the total number of possible divisors we have to check is small
-                *  (< 1000) then we default to using just one interval of length 1000.
-                */
-                const totalComputationLength = globalMax.minus(globalFirst);
-                const intervalLength = Decimal.max(totalComputationLength.div(D(1000)).floor(), D(1000));
-                return { globalMax, intervalLength};
-            });
-            
-            function computeSubinterval (quotient : Decimal, initialValueOfSubinterval : Decimal, subintervalMax : Decimal, intervalLength : Decimal) {
-                console.debug(`computeSubinterval quotient: ${quotient}; start: ${initialValueOfSubinterval}; end: ${subintervalMax}; intervalLength: ${intervalLength}; globalMax: ${globalMax}`);
-                return new Promise((resolve) => {
-                    let i = initialValueOfSubinterval;
-                    if (weHave("i >= global max", i.greaterThanOrEqualTo(globalMax))) {
-                        console.debug(`found i:${i} >= globalMax:${globalMax}`);
-                        weKnowThat(`no divisor of quotient has been found from
-                        start until max, which implies that quotient is prime`);
-                        since("quotient is prime", () => {
-                            letUs("return that the only factor of quotient is quotient", () => {
-                                resolve({status : "factor", payload : {"factor" : quotient.toString() }});
-                                foundNextFactor = true;
-                            });
-                        });
-                    } else {
-                        letUs("schedule the main division computation for this subinterval", () => {
-                            new Scheduler().schedule(() => {
-                                letUs("find the smallest i in the subinterval, if any, that divides the quotient", () => {
-                                    for (; i.lessThan(subintervalMax); i = i.plus(D(1))) {
-                                        this.we.assert.atLevel("ERROR").that("after i = globalFirst, then i = lastIntegerTested + 1", i == globalFirst || lastIntegerTested.plus(D(1)).equals(i));
-                                        
-                                        const iDividesQuotient = quotient.modulo(i).equals(0);
-                                        if (weHaveThat("i is a factor of quotient", iDividesQuotient)) {
-                                            letUs("send i back as first factor", () => {
-                                                resolve({status : "factor", payload : {"factor" : i.toString() }});
-                                                foundNextFactor = true;
-                                                lastIntegerTested = i;
-                                            });
-                                            break;
-                                        }
-
-                                        since("we want to make sure we don't accidentally skip any number", () => {
-                                            letUs("keep track of this number for comparison in the next iteration", () => {
-                                                lastIntegerTested = i;
-                                            });
-                                            
-                                        });
-                                    }
-                                });
-                                if (check("factoring has been halted", isHalt())) {
-                                    weKnowThat("that the factor request has received a halt request");
-                                    console.debug(`successfully halted: ${event.payload.integer}`);
-                                    since("the factoring function is not recursing", () => {
-                                        letUs(`post message to main thread confirming halt for the current integer`, () => {
-                                            const { integer } 
-                                            = {"integer" : event.payload.integer };
-                                            resolve({
-                                                status : "halted",
-                                                payload : {
-                                                    "message" : `successfully halted: ${integer}`,
-                                                    "integer" : integer
-                                                }
-                                            });
-                                        });
-                                    });
-                                } else {
-                                    weKnowThat("factoring has not been halted");
-                                    if (check("the next factor has not been found", !foundNextFactor)) {
-                                        since("factoring needs to continue", () => {
-                                            letUs("recurse down to continue to the next subinterval", () => {
-                                                resolve(computeSubinterval(quotient, subintervalMax, subintervalMax.plus(intervalLength), intervalLength));
-                                            });
-                                        });
-                                    }
-                                }
-                            }, {});
-                        });
-                    }
-                });
-            }
-            return letUs("kick off computation to find the first factor", () => {
-                return computeSubinterval(quotient, globalFirst, globalFirst.plus(intervalLength), intervalLength);
-            });
-        }
+        
         
         if (weHave("the caller posted a next factor request", event.status == "factor")) {
             this.isReceivedHaltRequest = false;
@@ -179,7 +183,7 @@ class NextFactorRequestHandler {
 
             console.log(`starting doComputation`);
             return letUs("start executing computation recursion", () => {
-                return findNextFactor(initialValue, quotient, () => this.isReceivedHaltRequest )
+                return this.findNextFactor(initialValue, quotient)
                     .then(
                         since("next factor computation is finished", () => {
                             return letUs("send next factor results back", () => {
@@ -215,13 +219,12 @@ class NextFactorRequestHandler {
                         }
                     });
             });
-        } else if (weHave("the caller sent a halt request", event.status === "halt")) {
-            console.debug(`received request to halt ${event.payload.integer}; attempting`);
-            given("the handler has received a request to halt", factorEvents[event.payload.integer]).then(() => {
-                console.debug(`ATTEMPTING TO HALT ${event.payload.integer}`);
-                letUs("execute a halt function to stop factoring", () => {
-                    factorEvents[event.payload.integer].halt();
-                });
+        } else if (weHave("the caller sent a halt request", event.status == "halt")) {
+            console.debug(`received request to halt factring primary integer: ${this.integer}; attempting`);
+
+            console.debug(`ATTEMPTING TO HALT ${event.payload.integer}`);
+            letUs("execute a halt function to stop factoring", () => {
+                this.haltComputation();
             });
             return Promise.resolve({
                 status : "received halt request",
@@ -233,6 +236,10 @@ class NextFactorRequestHandler {
             weKnowThat("A totally unexpected programming error has occurred");
             throw new Error("received unexpected event");
         }
-    };
-};
+    }
+
+    private haltComputation () {
+        this.isReceivedHaltRequest = true;
+    }
+}
 export default NextFactorRequestHandler;

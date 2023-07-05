@@ -43,10 +43,6 @@ export default defineComponent({
             default : () => {
                 return false;
             }
-        },
-        integerFactoringKey : {
-            type : Function,
-            default : () => uuidv4()
         }
     },
     data () {
@@ -64,16 +60,17 @@ export default defineComponent({
             workingString : "",
             history : [],
             currentActivity : "",
-            factorizer : Factorizer
+            factorizer : undefined as Factorizer | undefined,
+            integerIndex : 0 as number
         };
     },
     watch : {
         integerInput : Debounce(function (newValue, oldValue) {
             this.pushHistory(`integerInput changed to: ${newValue} from ${oldValue}`);
             console.debug(`changed input: ${newValue}`);
-            let check = this.checkValidInput(newValue);
-            console.debug(`ran input validity check: ${check}`);
-            if (check) {
+            const isInputValid = this.checkValidInput(newValue);
+            console.debug(`ran input validity check: ${isInputValid}`);
+            if (isInputValid) {
                 this.lastInteger = this.integer;
                 this.integer = new Decimal(newValue);
                 this.clear();
@@ -84,7 +81,7 @@ export default defineComponent({
                         console.debug("just called done function");
                         this.$emit("WorkComplete");
                         this.pushHistory(`work completed with ${val}`);
-                        for (let str of this.history) {
+                        for (const str of this.history) {
                             console.log(str);
                         }
                         if (this.checkProduct()) {
@@ -97,13 +94,13 @@ export default defineComponent({
                     .catch((val) => {
                         this.pushHistory(`work failed with ${val}`);
                         this.done();
-                        for (let str of this.history) {
+                        for (const str of this.history) {
                             console.log(str);
                         }
                     });
             }
-            this.invalidInput = !check;
-            if (!check)
+            this.invalidInput = !isInputValid;
+            if (!isInputValid)
                 console.log(`invalidInput: ${this.invalidInput}`);
         }, 100) as IntegerInput
     },
@@ -125,8 +122,8 @@ export default defineComponent({
             if (input.length == 0) {
                 isInputValid = false;
             }
-            let pattern = new RegExp(/^[1-9]\d*$/);
-            let match = pattern.exec(input);
+            const pattern = new RegExp(/^[1-9]\d*$/);
+            const match = pattern.exec(input);
             let parsedDec : Decimal;
             let isGreaterThan1 = false;
             try {
@@ -143,7 +140,7 @@ export default defineComponent({
             return isInputValid;
         },
         animateWaiting () {
-            let div = this.$refs.working;
+            const div = this.$refs.working;
             setInterval(function () {
                 div.style.color = "green";
                 setTimeout(function () {
@@ -159,7 +156,7 @@ export default defineComponent({
                 this.clearFactorize();
                 this.clearFactorize = undefined;
             }
-            for (let obs of this.observables) {
+            for (const obs of this.observables) {
                 obs.cancel();
             }
             if (this.worker) {
@@ -192,12 +189,12 @@ export default defineComponent({
         getStateString () {
             const getFactorString = () => {
                 let factorString = "";
-                for (let factor of this.factors) {
+                for (const factor of this.factors) {
                     factorString = `${factorString}(${factor.string})`;
                 }
                 return factorString;
             };
-            let factorString = getFactorString();
+            const factorString = getFactorString();
             return `XeroFactor2 State:
                 input: ${this.integerInput};
                 factorId : ${this.factorize.getId ? this.factorize.getId() : ""};
@@ -252,7 +249,7 @@ export default defineComponent({
         },
         checkProduct () {
             let product = new Decimal(1);
-            for (let i of this.factors) {
+            for (const i of this.factors) {
                 product = product.times(i.value);
             }
             return (product.equals(this.integer));
@@ -281,7 +278,7 @@ export default defineComponent({
                     } as Observable
                 };
             });
-            let waitFunction = (infun : ((...args : any[]) => void)) => {
+            const waitFunction = (infun : ((...args : any[]) => void)) => {
                 return new Promise((resolve) => {
                     this.$nextTick(() => {
                         window.requestAnimationFrame(() => {
@@ -290,7 +287,8 @@ export default defineComponent({
                     });
                 });
             };
-            const factorPromise = this.factorize(this.integerFactoringKey(), this.integer, this.worker, waitFunction, subscriber);
+            const factorPromise = this.factorizekkdnw(this.integerFactoringKey(), this.integer, this.worker, waitFunction, subscriber);
+            
             console.warn("by now the clearFactorizer function should be defined:", subscriber.clear);
             this.clearFactorize = subscriber.clear;
             subscriber.observable.subscribe((event : ObservableEvent) => {
@@ -323,6 +321,7 @@ export default defineComponent({
                 }   
             });
             this.observables.push(subscriber.observable);
+            this.factorIndex++;
             return factorPromise;
         }
     }

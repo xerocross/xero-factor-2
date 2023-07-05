@@ -8,13 +8,13 @@ import FactorRequestHandler from "./NextFactorRequestHandler";
 import { check, since, weKnowThat, letUs, weHave, soWe, so, weHaveThat } from "@xerocross/literate";
 import type { WaitFunction } from "./WaitFunction.d.ts";
 import type { QueryObject } from "./QueryObject";
-type CancelFunction = (command : string) => void;
+import NextFactorRequestHandler from "./NextFactorRequestHandler";
 
 
 
 class FactoringWorkObject {
     
-    constructor(id : string, primaryInteger: Decimal) {
+    constructor (id : string, primaryInteger : Decimal) {
         this.id = id;
         this.primaryInteger = primaryInteger;
     }
@@ -43,11 +43,10 @@ Decimal.set({ precision : 64 });
 
 class Factorizer {
 
-    constructor(queryObject : any, worker : Worker) {
+    constructor (queryObject : any, worker : Worker) {
         this.queryObject = queryObject;
         this.worker = worker;
         this.id = uuidv4().substring(0, 8);
-        this.factorRequestHandler = new FactorRequestHandler();
         this.we = WeAssert.build();
         this.we.setLevel("ERROR");
         this.we.setHandler((message : string) => {
@@ -59,11 +58,10 @@ class Factorizer {
     private id : string;
     private queryObject : QueryObject;
     private worker : Worker;
-    private factorRequestHandler : typeof FactorRequestHandler;
+    private nextFactorRequestHandlers : FactorRequestHandler[] = [];
     // prior
     
     private factorIndex : number;
-    const scheduleWatchers : Watcher[] = [] ;
     private waitFunction : WaitFunction;
     //const cancelFunctions : CancelFunction[] = [];
     //private lastFactor : Decimal | undefined;
@@ -92,11 +90,14 @@ class Factorizer {
     // size of the input quotient.
     // The point of this is to allow for greater responsivenss
     // in the browser even for computations with large numbers.
-    private getNextFactor = (factoringWorkObject: FactoringWorkObject) : Promise<Decimal> => {
-        let quotient = factoringWorkObject.currentQuotient;
-        let integer = factoringWorkObject.primaryInteger;
+
+    private getNextFactor = (factoringWorkObject : FactoringWorkObject) : Promise<Decimal> => {
+        const quotient = factoringWorkObject.currentQuotient;
+        const integer = factoringWorkObject.primaryInteger;
         let factorIndex = factoringWorkObject.getFactors().length;
-        
+        const nextFactorRequestHandler = new NextFactorRequestHandler(integer);
+        this.nextFactorRequestHandlers.push(nextFactorRequestHandler);
+
         console.debug(`${this.id}: finding next factor of ${quotient}`);
         this.we.assert.atLevel("ERROR").that("quotient is an integer", quotient.isInteger());
         return new Promise((nextFactorResolve) => {
@@ -119,7 +120,7 @@ class Factorizer {
                 // Obviously web workers are preferred, and
                 // if they are available on the browser, then
                 // we use them
-                this.factorRequestHandler.post({
+                nextFactorRequestHandler.post({
                     "status" : "factor",
                     "payload" : {
                         "quotient" : quotient.toString(),
@@ -177,7 +178,7 @@ class Factorizer {
         });
     }
     
-    async function factorRecursion (integer : Decimal, quotient : Decimal, observer : Observer) {
+    private factorRecursion = async (integer : Decimal, quotient : Decimal, observer : Observer) => {
         console.debug(`${id}  factor recursion: integer:${integer}; quotient:${quotient};`);
         const one = D(1);
         if (weHaveThat("the quotient is 1", quotient.equals(one))) {
@@ -216,7 +217,7 @@ class Factorizer {
         }
     }
 
-    this.factor = function (integer : Decimal, workerIn : Worker, waitFunctionIn : WaitFunction, subscriber : Subscriber) {
+    public factor = (integer : Decimal, workerIn : Worker, waitFunctionIn : WaitFunction, subscriber : Subscriber) => {
         const factorId = uuidv4();
         weKnowThat("we are resetting to factor a new inupt value", () => {
             soWe("reset globalHalt", () => {
@@ -248,7 +249,7 @@ class Factorizer {
 
             const observable = new Observable((observer : Observer) => {
                 console.log(`${id} starting factorRecursion`);
-                factorRecursion(integer, integer, observer)
+                this.factorRecursion(integer, integer, observer)
                     .then(() => {
                         console.debug(`${id} sending success event`);
                         observer.next({
@@ -282,11 +283,8 @@ class Factorizer {
         Object.assign(subscriber, { clear, factorId });
         return factorPromise;
     };
-    this.factor.getId = () => {
-        return id;
-    };
     
-    this.halt = () => {
+    halt = () => {
         this.FactorRequestHandler.post({
             "status" : "halt",
             "payload" : {

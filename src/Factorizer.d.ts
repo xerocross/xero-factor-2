@@ -26,4 +26,4 @@ export interface FactoringWorkObject {
     primaryInteger : Decimal
     factors : Decimal[],
     currentQuotient : Decimal
-};
+}

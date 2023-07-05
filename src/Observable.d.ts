@@ -4,7 +4,7 @@ export interface Observable {
 }
 export interface ObservableEvent {
     status : string,
-    payload ?: { [key : string] : any; }
+    payload : { [key : string] : any; }
 }
 export interface Observer {
     next : (event : ObservableEvent) => void
