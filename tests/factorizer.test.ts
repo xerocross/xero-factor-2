@@ -1,6 +1,7 @@
 import Factorizer from "../src/Factorizer";
 import Decimal from "decimal.js";
 import WeAssert from "we-assert";
+import type { QueryObject } from "../src/QueryObject";
 
 // to get a new scoped factor function define 
 // factor = factorizer()
@@ -8,7 +9,7 @@ import WeAssert from "we-assert";
 // integer is a Decimal object from decimal.js
 const we = WeAssert.build();
 we.setLevel("DEBUG");
-we.setHandler((message, payload) => {
+we.setHandler((message, level, payload) => {
     console.log(`validation failed: ${message}`);
     if (payload && payload.error) {
         console.log(payload.error);
@@ -24,8 +25,9 @@ we.setHandler((message, payload) => {
 const testFunction = function (configObject, timeout) {
     return new Promise((resolve, reject) => {
         const integer = new Decimal(configObject.integer);
-        we.assert.atLevel("ERROR").that("right now factor is undefined", factor === undefined);
-        const factor = new Factorizer().factor; // each factor function has its own scope
+        const queryObject : QueryObject = {};
+        const worker : Worker = new Worker();
+        const factor = new Factorizer(queryObject, worker).factor; // each factor function has its own scope
         const subscriber = {};
         factor(integer, configObject.worker, configObject.waitFunction, subscriber);
         // factor adds the observable object to the subscriber
