@@ -26,7 +26,7 @@ interface WorkerFactorRequestHaltObject {
 }
 
 class Factorizer {
-    constructor (queryObject : any, worker : Worker) {
+    constructor (queryObject : QueryObject, worker : Worker) {
         noteThat(`A singleton Factorizer will be created for each instance of the Xero-Factor-2 app.`);
         this.queryObject = queryObject;
         this.worker = worker;
@@ -52,12 +52,8 @@ class Factorizer {
         factorIndex : string
     })[] = [];
 
-    
-
     private workerFactorRequestHaltFunctions : WorkerFactorRequestHaltObject[] = [];
     private integerIndex = 0;
-    
-    
     private waitFunction : WaitFunction;
 
     // getNextFactor breaks up the work of finding
@@ -74,7 +70,6 @@ class Factorizer {
         const factorIndex = factoringWorkObject.factorIndex;
         const key = `${integer.toString()}${factorIndex}`;
         
-
         console.debug(`${this.id}: finding next factor of ${quotient}`);
         we.assert.atLevel("ERROR").that("quotient is an integer", quotient.isInteger());
 
