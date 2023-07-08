@@ -322,4 +322,10 @@ export default defineComponent({
             return factorPromise;
         }
     }
-});
+} as ThisType<{
+    factors : {
+        value : Decimal,
+        string : string,
+        key : number
+    }
+}>);
