@@ -12,7 +12,8 @@ weKnowThat(`In theory an integer could be repeated within the lifetime
 of the app.`);
 noteThat(`We define a new integerIndex for each validated user input, 
 and each attempt to find the next factor of a given input increments
-the factorIndex by 1 (to be reset back to 0 for each new valid integer input).`);
+the factorIndex by 1 (to be reset back to 0 each time factor is called
+    on a new validated input).`);
 so(`A key of the form key="[integerIndex][integer][factorIndex]" uniquely
 identifies a next factor request within the lifetime of the app.`);
 noteThat(`In fact adding [integer] to the key is redundant, but it 
@@ -85,6 +86,7 @@ self.addEventListener("message", function (event) {
                 nextFactorRequestHandler = nextFactorRequestHandlers[key];
                 nextFactorRequestHandler.halt();
             } else {
+                weKnowThat(`If this happens it is a programming error.`);
                 throw new Error(`NextFactorRequestHandler not found for key ${key}.`);
             }
         }
