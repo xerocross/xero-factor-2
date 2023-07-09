@@ -232,14 +232,14 @@ export default defineComponent({
                     break;
             }
         },
-        checkProduct () {
+        checkProduct () : boolean {
             let product = D(1);
             for (const i of this.factors) {
                 product = product.times(i.value);
             }
             return (product.equals(this.integer));
         },
-        factor () {
+        factor () : Promise<string> {
             interface Subscriber {
                 observable : Observable
             }
@@ -321,5 +321,6 @@ export default defineComponent({
         value : Decimal,
         string : string,
         key : number
-    }
+    },
+    pushHistory : (arg : string) => void
 }>);
