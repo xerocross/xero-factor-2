@@ -4,7 +4,6 @@ import { Decimal } from "decimal.js";
 import Factorizer from "../Factorizer";
 import type { Observable, ObservableEvent } from "../Observable.d";
 import { letUs } from "@xerocross/literate";
-import { v4 as uuidv4 } from "uuid";
 import WeAssert from "we-assert";
 import type { WaitFunction } from "../WaitFunction.d";
 
