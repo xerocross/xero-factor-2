@@ -48,12 +48,6 @@ export default defineComponent({
             default : () => {
                 return false;
             }
-        },
-        integerFactoringKey : {
-            type : Function,
-            default : () => {
-                return uuidv4();
-            }
         }
     },
     data () {
