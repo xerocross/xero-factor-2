@@ -11,5 +11,5 @@ export interface Observer {
 }
 export interface Subscriber { 
     cancel : () => void, 
-    observable : Observable | null
+    observable : Observable
 }

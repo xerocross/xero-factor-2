@@ -6,6 +6,7 @@ import type { Observable, ObservableEvent } from "../Observable.d";
 import { letUs } from "@xerocross/literate";
 import WeAssert from "we-assert";
 import type { WaitFunction } from "../WaitFunction.d";
+import type { FactorRequest } from "../Factorizer.d";
 
 Decimal.set({ precision : 64 });
 const { D } 
@@ -51,17 +52,17 @@ export default defineComponent({
     },
     data () {
         return {
-            integerInput : "2",
-            lastInteger : undefined,
+            integerInput : "2" as string,
+            lastInteger : undefined as Decimal | undefined,
             factors : [] as Factor[],
-            observables : [],
-            integer : new Decimal(2),
-            isWorking : false,
-            invalidInput : false,
-            isError : false,
-            factorIndex : 0,
+            //observables : [],
+            integer : new Decimal(2) as Decimal,
+            isWorking : false as boolean,
+            invalidInput : false as boolean,
+            isError : false as boolean,
+            factorIndex : 0 as number,
             workingString : "",
-            history : [],
+            history : [] as string[],
             currentActivity : "",
             factorizer : undefined as Factorizer | undefined,
             integerIndex : 0 as number
@@ -71,6 +72,44 @@ export default defineComponent({
         integerInput : Debounce(function (newValue : string, oldValue : string) {
             this.pushHistory(`integerInput changed to: ${newValue} from ${oldValue}`);
             console.debug(`changed input: ${newValue}`);
+            this.handleChangedInput(newValue);
+        }, 100) as IntegerInput
+    },
+    created () {
+        if (this.queryObject && this.queryObject.assertionLevel) {
+            we.setLevel(this.queryObject.assertionLevel);
+        }
+    },
+    mounted () {
+        letUs(`check if a Worker was found`, () => {
+            if (this.worker instanceof Worker) {
+                console.debug("found web worker");
+                this.workerFound(true);
+            } else {
+                this.workerFound(false);
+            }
+        });
+        this.animateWaiting();
+        letUs(`create the Factorizer object, which is a singleton for the app`, () => {
+            this.factorizer = new Factorizer(this.queryObject, this.worker);
+            this.pushHistory(`factorizer created`);
+            
+            const waitFunction : WaitFunction = (infun : ((...args : any[]) => void)) => {
+                return new Promise((resolve) => {
+                    this.$nextTick(() => {
+                        window.requestAnimationFrame(() => {
+                            resolve(infun());
+                        });
+                    });
+                });
+            };
+            this.factorizer.setWaitFunction(waitFunction);
+            this.pushHistory(`defined the wait function for the factorizer`);
+        });
+        this.pushHistory(`component mounted`);
+    },
+    methods : {
+        handleChangedInput (newValue : string) {
             const isInputValid = this.checkValidInput(newValue);
             console.debug(`ran input validity check: ${isInputValid}`);
             if (isInputValid) {
@@ -78,7 +117,7 @@ export default defineComponent({
                 this.integer = new Decimal(newValue);
                 this.clear();
                 this.factor()
-                    .then((val) => {
+                    .then((val : string) => {
                         this.isWorking = false;
                         this.done();
                         console.debug("just called done function");
@@ -94,34 +133,20 @@ export default defineComponent({
                             this.isError = true;
                         }
                     })
-                    .catch((val) => {
-                        this.pushHistory(`work failed with ${val}`);
+                    .catch((val : Error | string) => {
+                        this.pushHistory(`work failed`);
                         this.done();
                         for (const str of this.history) {
                             console.log(str);
                         }
+                        throw val;
                     });
             }
             this.invalidInput = !isInputValid;
-            if (!isInputValid)
+            if (!isInputValid) {
                 console.log(`invalidInput: ${this.invalidInput}`);
-        }, 100) as IntegerInput
-    },
-    mounted () {
-        this.animateWaiting();
-        if (this.worker instanceof Worker) {
-            console.debug("found web worker");
-            this.workerFound(true);
-        } else {
-            this.workerFound(false);
-        }
-        if (this.queryObject && this.queryObject.assertionLevel) {
-            we.setLevel(this.queryObject.assertionLevel);
-        }
-        this.factorizer = new Factorizer(this.queryObject, this.worker);
-        this.pushHistory(`component mounted`);
-    },
-    methods : {
+            }
+        },
         checkValidInput (input : string) {
             this.pushHistory(`checking validity of input: ${input}`);
             let isInputValid : boolean;
@@ -181,7 +206,7 @@ export default defineComponent({
             };
             const factorString = getFactorString();
             return `XeroFactor2 State:
-                input: ${this.integerInput};
+                integerInput: ${this.integerInput};
                 factorId : ${this.factorizer ? this.factorizer.getId() : ""};
                 factors: ${factorString};
                 isWorking: ${this.isWorking};
@@ -253,31 +278,18 @@ export default defineComponent({
             (that is, mutated) by the factorize function`, () => {
                 return {
                     observable : {
-                        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                        subscribe : (subFun) => {
+                        subscribe : () => {
                             console.error("the subscriber object was not properly mutated");
                         },
                         cancel : () => {}
                     } as Observable
                 };
             });
-            const waitFunction : WaitFunction = (infun : ((...args : any[]) => void)) => {
-                return new Promise((resolve) => {
-                    this.$nextTick(() => {
-                        window.requestAnimationFrame(() => {
-                            resolve(infun());
-                        });
-                    });
-                });
-            };
-
+            
             const factorPromise = this.factorizer.factor({
-                integer : this.integer, 
-                workerIn : this.worker, 
-                waitFunctionIn : waitFunction, 
-                subscriber,
-                id : this.id
-            });
+                integer : this.integer,
+                subscriber
+            } as FactorRequest);
 
             subscriber.observable.subscribe((event : ObservableEvent) => {
                 const status = event.status;
@@ -308,18 +320,11 @@ export default defineComponent({
                         break;
                 }   
             });
-            this.observables.push(subscriber.observable);
+            //this.observables.push(subscriber.observable);
             // recall that keeping track of factorIndex at this
             // level helps with displaying factors on the template
             this.factorIndex++;
             return factorPromise;
         }
     }
-} as ThisType<{
-    factors : {
-        value : Decimal,
-        string : string,
-        key : number
-    },
-    pushHistory : (arg : string) => void
-}>);
+});

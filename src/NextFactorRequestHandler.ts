@@ -3,7 +3,7 @@ import WeAssert from "we-assert";
 import DataIs from "@xerocross/data-is";
 import { check, since, weKnowThat, letUs, weHave, weHaveThat } from "@xerocross/literate";
 import Scheduler from "./Scheduler";
-import type { FactoringEvent } from "./Factorizer.d";
+import type { NextFactorInformationObject, NextFactorRequestEvent } from "./NextFactorRequestHandler.d";
 import { v4 as uuidv4 } from "uuid";
 
 const { D } 
@@ -14,13 +14,7 @@ const { D }
         return  { D };
     });
 
-    interface NextFactorResult {
-        status : string,
-        payload : {
-            [key : string] : any
-        },
-        key : string
-    }
+    
 
 class NextFactorRequestHandler {
     
@@ -37,6 +31,7 @@ class NextFactorRequestHandler {
             }
         });
         this.id = uuidv4();
+        this.isReceivedHaltRequest = false;
     }
     private we;
     private data;
@@ -65,7 +60,7 @@ class NextFactorRequestHandler {
             return { globalMax, intervalLength};
         });
         
-        const computeSubinterval = (quotient : Decimal, initialValueOfSubinterval : Decimal, subintervalMax : Decimal, intervalLength : Decimal) => {
+        const computeSubinterval = (quotient : Decimal, initialValueOfSubinterval : Decimal, subintervalMax : Decimal, intervalLength : Decimal) : Promise<NextFactorInformationObject> => {
             console.debug(`computeSubinterval quotient: ${quotient}; start: ${initialValueOfSubinterval}; end: ${subintervalMax}; intervalLength: ${intervalLength}; globalMax: ${globalMax}`);
             return new Promise((resolve) => {
                 let i = initialValueOfSubinterval;
@@ -74,9 +69,18 @@ class NextFactorRequestHandler {
                     weKnowThat(`no divisor of quotient has been found from
                     start until max, which implies that quotient is prime`);
                     since("quotient is prime", () => {
-                        letUs("return that the only factor of quotient is quotient", () => {
-                            resolve({status : "factor", payload : {"factor" : quotient.toString() }});
-                            foundNextFactor = true;
+                        letUs("return that the 'next' factor of quotient is quotient", () => {
+                            resolve({
+                                status : "factor", 
+                                payload : {
+                                    factor : quotient.toString(),
+                                    integer : this.integer.toString(),
+                                    message : `${quotient} is prime`
+                                }
+                            });
+                            letUs("set a flag indicating that the next factor has been found", () => {
+                                foundNextFactor = true;
+                            });
                         });
                     });
                 } else {
@@ -89,7 +93,14 @@ class NextFactorRequestHandler {
                                     const iDividesQuotient = quotient.modulo(i).equals(0);
                                     if (weHaveThat("i is a factor of quotient", iDividesQuotient)) {
                                         letUs("send i back as first factor", () => {
-                                            resolve({status : "factor", payload : {"factor" : i.toString() }});
+                                            resolve({
+                                                status : "factor", 
+                                                payload : {
+                                                    factor : i.toString(),
+                                                    integer : this.integer.toString(),
+                                                    message : `${i} is a factor of ${this.integer}`
+                                                }
+                                            });
                                             foundNextFactor = true;
                                             lastIntegerTested = i;
                                         });
@@ -108,14 +119,15 @@ class NextFactorRequestHandler {
                                 weKnowThat("that the factor request has received a halt request");
                                 console.debug(`successfully halted: ${this.integer}`);
                                 since("the factoring function is not recursing", () => {
-                                    letUs(`post message to main thread confirming halt for the current integer`, () => {
+                                    letUs(`post message to caller confirming halt for the current integer`, () => {
                                         const { integer } 
                                         = {"integer" : this.integer };
                                         resolve({
                                             status : "halted",
                                             payload : {
-                                                "message" : `successfully halted: ${integer}`,
-                                                "integer" : integer
+                                                factor : "",
+                                                message : `successfully halted: ${integer}`,
+                                                integer : integer.toString()
                                             }
                                         });
                                     });
@@ -140,8 +152,9 @@ class NextFactorRequestHandler {
         });
     };
 
+    
 
-    public post (event : FactoringEvent) {
+    public post (event : NextFactorRequestEvent) : Promise<NextFactorInformationObject> {
         console.debug("called FactorRequestHandler:post");
         if (weHave("the caller posted a next factor request", event.status == "factor")) {
             this.isReceivedHaltRequest = false;
@@ -153,7 +166,7 @@ class NextFactorRequestHandler {
                         const quotient = D(event.payload.quotient);
                         const { lastFactor } 
                         = since("there is no need to check values smaller than the last factor", () => {
-                            return letUs("validate and handle the last factor if sent by the main thread", () => {
+                            return letUs("validate and handle the last factor if sent by the caller", () => {
                                 let lastFactor : Decimal;
                                 if (event.payload.lastFactor == "") {
                                     lastFactor = D(1);
@@ -167,7 +180,7 @@ class NextFactorRequestHandler {
                         const initialValue = Decimal.max(D(2), lastFactor);
                         return {quotient, initialValue};
                     }));
-            } catch (e) {
+            } catch (e : unknown) {
                 return since("we encountered an error during the basic setup of the computation", () => {
                     return letUs("return the error to the caller", () => {
                         return Promise.resolve({
@@ -187,7 +200,7 @@ class NextFactorRequestHandler {
                     .then(
                         since("next factor computation is finished", () => {
                             return letUs("send next factor results back", () => {
-                                return (result : NextFactorResult) => {
+                                return (result : NextFactorInformationObject) => {
                                     return {
                                         status : result.status,
                                         payload : result.payload,
@@ -197,13 +210,12 @@ class NextFactorRequestHandler {
                             });
                         })
                     )
-                    .catch((e) => {
+                    .catch((e : unknown) => {
                         if (weHave("exception was a halt request, not an error", e == "halt")) {
                             return {
                                 "status" : "halted",
                                 "payload" : {
                                     "integer" : event.payload.integer
-                                    
                                 },
                                 "key" : event.key
                             };
@@ -224,7 +236,7 @@ class NextFactorRequestHandler {
 
             console.debug(`ATTEMPTING TO HALT ${event.payload.integer}`);
             letUs("execute a halt function to stop factoring", () => {
-                this.haltComputation();
+                this.halt();
             });
             return Promise.resolve({
                 status : "received halt request",
@@ -236,10 +248,6 @@ class NextFactorRequestHandler {
             weKnowThat("A totally unexpected programming error has occurred");
             throw new Error("received unexpected event");
         }
-    }
-
-    private haltComputation () {
-        this.isReceivedHaltRequest = true;
     }
 
     public halt () {

@@ -3,12 +3,11 @@ import { Observer } from "./Observable.d";
 import { Decimal } from "decimal.js";
 import WeAssert from "we-assert";
 import { v4 as uuidv4 } from "uuid";
-import FactorRequestHandler from "./NextFactorRequestHandler";
+import NextFactorRequestHandler from "./NextFactorRequestHandler";
 import { weKnowThat, letUs, so, weHaveThat, noteThat, since } from "@xerocross/literate";
 import type { WaitFunction } from "./WaitFunction.d.ts";
 import type { QueryObject } from "./QueryObject";
-import NextFactorRequestHandler from "./NextFactorRequestHandler";
-import type { FactorRequestResponse } from "./NextFactorRequestHandler.d";
+import type { NextFactorInformationObject } from "./NextFactorRequestHandler.d";
 import type { FactoringWorkObject, FactorRequest, FactoringEvent } from "./Factorizer.d";
 
 const { D } 
@@ -26,7 +25,7 @@ interface WorkerFactorRequestHaltObject {
 }
 
 class Factorizer {
-    constructor (queryObject : QueryObject, worker : Worker) {
+    constructor (queryObject : QueryObject, worker : Worker | null) {
         noteThat(`A singleton Factorizer will be created for each instance of the Xero-Factor-2 app.`);
         this.queryObject = queryObject;
         this.worker = worker;
@@ -43,9 +42,9 @@ class Factorizer {
 
     private id : string;
     private queryObject : QueryObject;
-    private worker : Worker;
+    private worker : Worker | null;
     private nextFactorRequestHandlers : ({
-        handler : FactorRequestHandler,
+        handler : NextFactorRequestHandler,
         id : string,
         key : string
         integer : string
@@ -54,7 +53,7 @@ class Factorizer {
 
     private workerFactorRequestHaltFunctions : WorkerFactorRequestHaltObject[] = [];
     private integerIndex = 0;
-    private waitFunction : WaitFunction;
+    private waitFunction : WaitFunction | undefined;
 
     // getNextFactor breaks up the work of finding
     // the next factor into asynchronous smaller calculations
@@ -62,6 +61,11 @@ class Factorizer {
     // size of the input quotient.
     // The point of this is to allow for greater responsivenss
     // in the browser even for computations with large numbers.
+
+    public setWaitFunction (waitFunction : WaitFunction) {
+        this.waitFunction = waitFunction;
+    }
+
 
     private getNextFactor = (factoringWorkObject : FactoringWorkObject) : Promise<Decimal> => {
         const quotient = factoringWorkObject.quotient;
@@ -115,7 +119,7 @@ class Factorizer {
                     key : key
                 });
                 nextFactorRequestHandler.post(factorRequest)
-                    .then((response : FactorRequestResponse) => {
+                    .then((response : NextFactorInformationObject) => {
                         if (response.status == "factor" && response.key == key) {
                             console.debug(`${this.id} worker sent message: next factor : ${response.payload.factor}; key : ${response.key}`);
                             if (response.payload.factor) {
@@ -137,7 +141,7 @@ class Factorizer {
                     .catch((e) => {
                         console.error("an unexpected error occured", e);
                     });
-            } else {
+            } else if (this.worker instanceof Worker) {
                 weKnowThat(`web worker is defined`);
                 console.debug(`${this.id} using worker`);
                 this.worker.onmessage = (e) => {
@@ -145,7 +149,7 @@ class Factorizer {
                         this.workerFactorRequestHaltFunctions.push({
                             halt : () => {
                                 console.warn(`halt! integer: ${integer.toString()}; quotient: ${quotient}; key: ${e.data.key}`);
-                                this.worker.postMessage({
+                                (this.worker as Worker).postMessage({
                                     status : "halt",
                                     payload : {
                                         integer : integer.toString(),
@@ -172,11 +176,13 @@ class Factorizer {
                 };
                 console.warn("posting to worker now");
                 this.worker.postMessage(factorRequest);
+            } else {
+                throw new Error("unexpected Worker error");
             }
         });
     };
 
-    private factorRecursion = async (factoringWorkObject : FactoringWorkObject) => {
+    private factorRecursion = async (factoringWorkObject : FactoringWorkObject) : Promise<void> => {
         const integer = factoringWorkObject.primaryInteger;
         const quotient = factoringWorkObject.quotient;
         const lastFactor = factoringWorkObject.lastFactor;
@@ -238,7 +244,7 @@ class Factorizer {
     };
 
     public factor = (factorRequest : FactorRequest) => {
-        const factorId = uuidv4();
+        //const factorId = uuidv4();
         noteThat("we are resetting to factor a new inupt value", () => {
             so(`we begin factoring integer : ${factorRequest.integer}`);
         });
@@ -250,7 +256,6 @@ class Factorizer {
         };
 
         const factorPromise = new Promise((factorResolve, factorReject) => {
-            this.waitFunction = factorRequest.waitFunctionIn;
             const factorIndex =
                 letUs("keep track of which factor we are computing", () => {
                     return 0;
@@ -299,7 +304,7 @@ class Factorizer {
             });
             
         });
-        Object.assign(factorRequest.subscriber, { factorId });
+        //Object.assign(factorRequest.subscriber, { factorId });
         return factorPromise;
     };
     
@@ -308,13 +313,13 @@ class Factorizer {
         for (const factorRequestHandler of this.nextFactorRequestHandlers) {
             console.warn(`calling halt function on ${factorRequestHandler.integer}`);
             factorRequestHandler.handler.post({
-                "status" : "halt",
-                "key" : factorRequestHandler.key,
-                "id" : factorRequestHandler.id,
-                "payload" : {
-                    "integer" : factorRequestHandler.integer,
-                    "integerIndex" : this.integerIndex.toString(),
-                    "factorIndex" : factorRequestHandler.factorIndex
+                status : "halt",
+                key : factorRequestHandler.key,
+                id : factorRequestHandler.id,
+                payload : {
+                    integer : factorRequestHandler.integer,
+                    integerIndex : this.integerIndex.toString(),
+                    factorIndex : factorRequestHandler.factorIndex
                 }
             });
         }

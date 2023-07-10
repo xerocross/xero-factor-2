@@ -7,11 +7,8 @@ export interface FactorizerEvent {
     payload ?: any
 }
 export interface FactorRequest {
-    integer : Decimal, 
-    workerIn : Worker, 
-    waitFunctionIn : WaitFunction, 
-    subscriber : Subscriber,
-    id : string
+    integer : Decimal,
+    subscriber : Subscriber
 }
 export interface Factorizer {
     factor : (integer : Decimal, workerIn : Worker, waitFunctionIn : WaitFunction, subscriber : Subscriber) => ObservableEvent
@@ -21,9 +18,9 @@ export interface FactoringEvent {
     status : string,
     id : string,
     payload : { 
-        integer ?: string,
-        lastFactor ?: string,
-        quotient ?: string,
+        integer : string,
+        lastFactor : string,
+        quotient : string,
         integerIndex : string,
         factorIndex : string
      },
