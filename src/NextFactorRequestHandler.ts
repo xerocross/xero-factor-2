@@ -198,7 +198,6 @@ class NextFactorRequestHandler {
                             letUs("find the smallest i in the subinterval, if any, that divides the quotient", () => {
                                 for (; i.lessThan(subintervalMax); i = i.plus(D(1))) {
                                     we.assert.atLevel("ERROR").that("after i = globalFirst, then i = lastIntegerTested + 1", i == globalFirst || lastIntegerTested.plus(D(1)).equals(i));
-                                    
                                     const iDividesQuotient = quotient.modulo(i).equals(0);
                                     if (weHaveThat("i is a factor of quotient", iDividesQuotient)) {
                                         letUs("send i back as first factor", () => {
@@ -215,12 +214,10 @@ class NextFactorRequestHandler {
                                         });
                                         break;
                                     }
-
                                     since("we want to make sure we don't accidentally skip any number", () => {
                                         letUs("keep track of this number for comparison in the next iteration", () => {
                                             lastIntegerTested = i;
                                         });
-                                        
                                     });
                                 }
                             });
