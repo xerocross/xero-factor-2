@@ -2,9 +2,11 @@ import Decimal from "decimal.js";
 import WeAssert from "we-assert";
 import DataIs from "@xerocross/data-is";
 import { v4 as uuidv4 } from "uuid";
-import { check, since, weKnowThat, letUs, weHave, weHaveThat, noteThat } from "@xerocross/literate";
+import { setVerbose as LiterateSetVerbose, check, since, weKnowThat, letUs, weHave, weHaveThat, noteThat } from "@xerocross/literate";
 import Scheduler from "./Scheduler";
 import type { NextFactorInformationObject, NextFactorRequestEvent } from "./NextFactorRequestHandler.d";
+
+LiterateSetVerbose(true);
 
 const { D } 
     = letUs("define Decimal alias", () => {
