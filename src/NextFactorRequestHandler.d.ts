@@ -1,9 +1,9 @@
 export interface NextFactorInformationObject {
     status : string,
     payload : {
-        [key : string] : string,
-        error ?: unknown
+        [key : string] : string
     },
+    error ?: unknown
     key ?: string
 }
 

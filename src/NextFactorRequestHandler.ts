@@ -65,59 +65,58 @@ class NextFactorRequestHandler {
                         return {quotient, initialValue};
                     }));
             } catch (e : unknown) {
+                noteThat(`in this case post returns a Promise<NextFactorInformationObject>`);
                 return since("we encountered an error during the basic setup of the computation", () => {
                     return letUs("return the error to the caller", () => {
                         return Promise.resolve({
-                            "status" : "error",
-                            "payload" : {
-                                "error" : e,
-                                "message" : "encountered an error while reading inputs"
-                            }
-                        });
+                            status : "error",
+                            payload : {
+                                message : "encountered an error while reading inputs"
+                            },
+                            error : e
+                        } as NextFactorInformationObject);
                     });
                 });
             }
-
+            noteThat("initial values were set up correctly if we reach this point");
             console.log(`starting doComputation`);
             return letUs("start executing computation recursion", () => {
                 return this.findNextFactor(initialValue, quotient)
-                    .then(
-                        since("next factor computation is finished", () => {
-                            return letUs("send next factor results back", () => {
-                                return (result : NextFactorInformationObject) => {
-                                    return {
-                                        status : result.status,
-                                        payload : result.payload,
-                                        key : event.key
-                                    };
-                                };
+                    .then((result : NextFactorInformationObject) => {
+                        return since("next factor computation is finished", () => {
+                            return letUs("send next factor results back: we redefine postResult", () => {
+                                return {
+                                    status : result.status,
+                                    payload : result.payload,
+                                    key : event.key,
+                                    error : result.error ? result.error : null
+                                } as NextFactorInformationObject;
                             });
-                        })
-                    )
+                        });
+                    })
                     .catch((e : unknown) => {
                         if (weHave("exception was a halt request, not an error", e == "halt")) {
                             return {
-                                "status" : "halted",
-                                "payload" : {
-                                    "integer" : event.payload.integer
+                                status : "halted",
+                                payload : {
+                                    integer : event.payload.integer
                                 },
-                                "key" : event.key
-                            };
+                                key : event.key
+                            } as NextFactorInformationObject;
                         } else {
                             return {
-                                "status" : "error",
-                                "payload" : {
-                                    "error" : e,
-                                    "integer" : event.payload.integer
+                                status : "error",
+                                payload : {
+                                    integer : event.payload.integer
                                 },
-                                "key" : event.key
-                            };
+                                error : e,
+                                key : event.key
+                            } as NextFactorInformationObject;
                         }
                     });
             });
         } else if (weHave("the caller sent a halt request", event.status == "halt")) {
-            console.debug(`received request to halt factring primary integer: ${this.integer}; attempting`);
-
+            console.debug(`received request to halt factoring primary integer: ${this.integer}; attempting`);
             console.debug(`ATTEMPTING TO HALT ${event.payload.integer}`);
             letUs("execute a halt function to stop factoring", () => {
                 this.halt();
@@ -125,12 +124,13 @@ class NextFactorRequestHandler {
             return Promise.resolve({
                 status : "received halt request",
                 payload : {
-                    "integer" : event.payload.integer
+                    integer : event.payload.integer
                 }
-            });
+            } as NextFactorInformationObject);
         } else {
-            weKnowThat("A totally unexpected programming error has occurred");
-            throw new Error("received unexpected event");
+            throw since("we recieved a totally unexpected post event", () => {
+                return new Error("received an unexpected post event");
+            });
         }
     }
 
@@ -142,7 +142,7 @@ class NextFactorRequestHandler {
         return this.id;
     }
 
-    private findNextFactor = (globalFirst : Decimal, quotient : Decimal) => {
+    private findNextFactor = (globalFirst : Decimal, quotient : Decimal) : Promise<NextFactorInformationObject> => {
         let lastIntegerTested : Decimal;
         let foundNextFactor = false;
         console.log(`doComputation: ${quotient}.`);
