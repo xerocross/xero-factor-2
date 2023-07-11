@@ -42,6 +42,9 @@ class NextFactorRequestHandler {
         console.debug("called FactorRequestHandler:post");
         if (weHave("the caller posted a next factor request", event.status == "factor")) {
             this.isReceivedHaltRequest = false;
+            noteThat(`here we set up the values for quotient and initialValue:
+             initialValue is the starting value for which we need to start testing
+             for factors.`);
             let quotient : Decimal, initialValue : Decimal;
             try {
                 ({quotient, initialValue} 
@@ -154,6 +157,8 @@ class NextFactorRequestHandler {
             /*
             * For large numbers, we divide the work up into subintervals so that
             * there will be at most 1000 subintervals before finding the next factor.
+            * Note that if the quotient is very large, then each 1000th subinterval
+            * can still be a lengthy computation.
             * If the total number of possible divisors we have to check is small
             *  (< 1000) then we default to using just one interval of length 1000.
             */
