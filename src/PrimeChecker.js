@@ -19,4 +19,4 @@ export default function isPrime (num) {
         }
     }
     return true;
-};
+}

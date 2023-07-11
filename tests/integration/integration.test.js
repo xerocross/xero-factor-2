@@ -11,7 +11,7 @@ function simulateUserWaiting (done, timeout) {
                 clearTimeout(intervalAsync);
                 resolve(true);
             }
-        },100);
+        }, 100);
         setTimeout(() => {
             console.log("TIMEOUT");
             clearTimeout(intervalAsync);
@@ -26,7 +26,7 @@ function wait (time) {
             resolve(true);
         }, time);
     });
-};
+}
 
 function buildWebWorker (responseArray, integer) {
     return function () {
@@ -187,7 +187,7 @@ describe("for web worker disabled", () => {
             
             doneFunctionRan = true;
         };
-        xeroFactor2 = mount(XeroFactor2,{
+        xeroFactor2 = mount(XeroFactor2, {
             props : {
                 done : workComplete
             }
@@ -208,7 +208,7 @@ describe("for web worker disabled", () => {
             
             doneFunctionRan = true;
         };
-        xeroFactor2 = mount(XeroFactor2,{
+        xeroFactor2 = mount(XeroFactor2, {
             props : {
                 done : workComplete
             }
@@ -252,7 +252,7 @@ describe("for web worker disabled", () => {
         let workComplete = () => {
             doneFunctionRan = true;
         };
-        xeroFactor2 = mount(XeroFactor2,{
+        xeroFactor2 = mount(XeroFactor2, {
             props : {
                 done : workComplete
             }
@@ -333,7 +333,7 @@ describe("with mock worker", () => {
             }
         });
         let numInput = getPrimaryNumberInput(xeroFactor2);
-        myWorker = new buildWebWorker(["2","2","3"], 12);
+        myWorker = new buildWebWorker(["2", "2", "3"], 12);
         xeroFactor2.vm.$nextTick(() => {
             numInput.setValue("12");
         });
@@ -354,7 +354,7 @@ describe("with mock worker", () => {
                 "done" : myWorkDoneFunction
             }
         });
-        myWorker = new buildWebWorker(["2","7"], 14);
+        myWorker = new buildWebWorker(["2", "7"], 14);
         xeroFactor2.vm.$nextTick(() => {
             let numInput = getPrimaryNumberInput(xeroFactor2);
             numInput.setValue("14");
