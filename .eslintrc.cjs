@@ -63,7 +63,8 @@ module.exports = {
         "@typescript-eslint/type-annotation-spacing" : ["error", {
             "before" : true,
             "after" : true
-        }]
+        }],
+        "no-multiple-empty-lines" : ["error", { "max" : 2 }]
     },
     globals : {
         "env" : false,

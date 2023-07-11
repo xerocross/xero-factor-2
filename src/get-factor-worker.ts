@@ -7,8 +7,6 @@ interface NextFactorRequestHandlerIndex {
     [key : string] : NextFactorRequestHandler
 }
 
-
-
 const nextFactorRequestHandlers : NextFactorRequestHandlerIndex = {};
 
 noteThat(`There will be just one instance of this script
@@ -104,6 +102,3 @@ self.addEventListener("message", function (event : WebWorkerRequest) {
         }
     }
 });
-
-
-
