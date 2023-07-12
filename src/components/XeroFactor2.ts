@@ -31,6 +31,7 @@ export default defineComponent({
     name : "XeroFactor2",
     props : {
         worker : {
+            type : Object as () => Worker | null,
             default : null
         },
         queryObject : {

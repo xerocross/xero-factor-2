@@ -1,10 +1,11 @@
-import { shallowMount, mount } from "@vue/test-utils";
-import XeroFactor2 from "../../src/components/XeroFactor2.vue";
+import { shallowMount, mount, VueWrapper } from "@vue/test-utils";
+import { defineComponent } from "vue";
+import XeroFactor2 from "../../src/components/XeroFactor2";
 
-let Worker = null;
-let xeroFactor2;
 
-function simulateUserWaiting (done, timeout) {
+let xeroFactor2 : VueWrapper<ReturnType<typeof defineComponent>>;
+
+function simulateUserWaiting (done : () => boolean, timeout : number) {
     return new Promise((resolve, reject) => {
         const intervalAsync = setInterval(() => {
             if (done()) {
@@ -20,51 +21,52 @@ function simulateUserWaiting (done, timeout) {
     });
 }
 
-function wait (time) {
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            resolve(true);
-        }, time);
-    });
-}
-
-function buildWebWorker (responseArray, integer) {
-    return function () {
-        let postIndex = 0;
+class WebWorker extends window.Worker {
+    constructor (responseArray : string[], integer : number) {
+        super("");
+        this.responseArray = responseArray;
+        this.integer = integer;
+        this.postIndex = 0;
         this.onmessage = () => {};
         this.postMessage = () => {
-            let key = "" + integer + postIndex;
+            const key = "" + integer + this.postIndex;
             this.onmessage({
                 data : {
-                    "key" : key,
-                    "result" : responseArray[postIndex]
+                    key : key,
+                    result : responseArray[this.postIndex]
                 }
             });
-            postIndex++;
+            this.postIndex++;
         };
-    };
+    }
+    private postIndex;
+    private responseArray : string[];
+    private integer : number;
+    public onmessage : (arg : any) => any;
+    public postMessage : () => any;
 }
 
+let globalWorker = Worker;
 
-function getPrimaryNumberInput (xeroFactor2) {
+function getPrimaryNumberInput (xeroFactor2 : VueWrapper<ReturnType<typeof defineComponent>>) {
     return xeroFactor2.find(".primary-number-input");
 }
 
-function getFactorListOuter (xeroFactor2) {
+function getFactorListOuter (xeroFactor2 : VueWrapper<ReturnType<typeof defineComponent>>) {
     return xeroFactor2.find(".factors-list");
 }
 
-function getVisibleFactors (xeroFactor2) {
-    let outer = getFactorListOuter(xeroFactor2);
+function getVisibleFactors (xeroFactor2 : VueWrapper<ReturnType<typeof defineComponent>>) {
+    const outer = getFactorListOuter(xeroFactor2);
     return outer.findAll(".factor-item");
 }
-function getIsWorkingMessage (xeroFactor2) {
+function getIsWorkingMessage (xeroFactor2 : VueWrapper<ReturnType<typeof defineComponent>>) {
     return xeroFactor2.find(".is-working-message");
 }
 beforeEach(() => {
     localStorage.clear();
     
-    Worker = () => {
+    Worker = ("") => {
         throw new Error("worker not defined");
     };
 });
@@ -88,19 +90,18 @@ describe("mounting", () => {
     });
     test("initial input value is '2'", async () => {
         xeroFactor2 = shallowMount(XeroFactor2);
-        let numInput = getPrimaryNumberInput(xeroFactor2);
+        const numInput = getPrimaryNumberInput(xeroFactor2);
         await xeroFactor2.vm.$nextTick();
-        expect(numInput.element.value).toBe("2");
+        expect((numInput.element as HTMLInputElement).value).toBe("2");
     });
     
     test("primary number input exists", async () => {
         xeroFactor2 = shallowMount(XeroFactor2);
-        let numInput = getPrimaryNumberInput(xeroFactor2);
+        const numInput = getPrimaryNumberInput(xeroFactor2);
         await xeroFactor2.vm.$nextTick();
         expect(numInput.exists()).toBe(true);
     });
 });
-
 
 
 describe("input validity checks", () => {
@@ -109,7 +110,7 @@ describe("input validity checks", () => {
         Worker = null;
         xeroFactor2 = shallowMount(XeroFactor2);
         await xeroFactor2.vm.$nextTick();
-        let numInput = getPrimaryNumberInput(xeroFactor2);
+        const numInput = getPrimaryNumberInput(xeroFactor2);
         numInput.setValue("-2");
         await xeroFactor2.vm.$nextTick();
         jest.advanceTimersByTime(400);
@@ -122,7 +123,7 @@ describe("input validity checks", () => {
         Worker = null;
         xeroFactor2 = shallowMount(XeroFactor2);
         await xeroFactor2.vm.$nextTick();
-        let numInput = getPrimaryNumberInput(xeroFactor2);
+        const numInput = getPrimaryNumberInput(xeroFactor2);
         await xeroFactor2.vm.$nextTick();
         numInput.setValue("2.3");
         await xeroFactor2.vm.$nextTick();
@@ -135,7 +136,7 @@ describe("input validity checks", () => {
         jest.useFakeTimers();
         Worker = null;
         xeroFactor2 = shallowMount(XeroFactor2);
-        let numInput = getPrimaryNumberInput(xeroFactor2);
+        const numInput = getPrimaryNumberInput(xeroFactor2);
         numInput.setValue("2a");
         await xeroFactor2.vm.$nextTick();
         jest.advanceTimersByTime(1000);
@@ -145,7 +146,7 @@ describe("input validity checks", () => {
 });
 
 test("during working, shows '(working)' message",  async () => {
-    window.Worker = null;
+    Worker = null;
     xeroFactor2 = mount(XeroFactor2);
     let functionRan = false;
     let isWorkingExists = false;
@@ -154,7 +155,7 @@ test("during working, shows '(working)' message",  async () => {
         xeroFactor2.vm.logState();
         isWorkingExists = getIsWorkingMessage(xeroFactor2).exists();
     };
-    let numInput = getPrimaryNumberInput(xeroFactor2);
+    const numInput = getPrimaryNumberInput(xeroFactor2);
     numInput.setValue("12");
     await simulateUserWaiting(() => functionRan, 500);
     expect(isWorkingExists).toBeTruthy();
@@ -162,9 +163,9 @@ test("during working, shows '(working)' message",  async () => {
 
 describe("for web worker disabled", () => {
     test("input number 3 produces prime factors '(3)'", async () => {
-        window.Worker = null;
+        Worker = undefined;
         let doneFunctionRan = false;
-        let workComplete = () => {
+        const workComplete = () => {
             doneFunctionRan = true;
         };
         xeroFactor2 = mount(XeroFactor2, {
@@ -172,18 +173,18 @@ describe("for web worker disabled", () => {
                 done : workComplete
             }
         });
-        let numInput = getPrimaryNumberInput(xeroFactor2);
+        const numInput = getPrimaryNumberInput(xeroFactor2);
         
         numInput.setValue("3");
         await simulateUserWaiting(() => doneFunctionRan, 500);
-        let visibleFactors = getVisibleFactors(xeroFactor2);
-        expect(visibleFactors.at(0).text()).toBe("(3)");
+        const visibleFactors = getVisibleFactors(xeroFactor2)!;
+        expect(visibleFactors.at(0)!.text()).toBe("(3)");
         expect(visibleFactors.length).toBe(1);
     });
     test("input number 12 produces prime factors '(2)(2)(3)'", async () => {
-        window.Worker = null;
+        Worker = null;
         let doneFunctionRan = false;
-        let workComplete = () => {
+        const workComplete = () => {
             
             doneFunctionRan = true;
         };
@@ -192,19 +193,19 @@ describe("for web worker disabled", () => {
                 done : workComplete
             }
         });
-        let numInput = getPrimaryNumberInput(xeroFactor2);
+        const numInput = getPrimaryNumberInput(xeroFactor2);
         numInput.setValue("12");
         await simulateUserWaiting(() => doneFunctionRan, 1000);
-        let visibleFactors = getVisibleFactors(xeroFactor2);
-        expect(visibleFactors.at(0).text()).toBe("(2)");
-        expect(visibleFactors.at(1).text()).toBe("(2)");
-        expect(visibleFactors.at(2).text()).toBe("(3)");
+        const visibleFactors = getVisibleFactors(xeroFactor2);
+        expect(visibleFactors.at(0)!.text()).toBe("(2)");
+        expect(visibleFactors.at(1)!.text()).toBe("(2)");
+        expect(visibleFactors.at(2)!.text()).toBe("(3)");
         expect(visibleFactors.length).toBe(3);
     });
     test("input number 5562 produces prime factors '(2)(3)(3)(3)(103)'", async () => {
-        window.Worker = null;
+        Worker = null;
         let doneFunctionRan = false;
-        let workComplete = () => {
+        const workComplete = () => {
             
             doneFunctionRan = true;
         };
@@ -213,21 +214,21 @@ describe("for web worker disabled", () => {
                 done : workComplete
             }
         });
-        let numInput = getPrimaryNumberInput(xeroFactor2);
+        const numInput = getPrimaryNumberInput(xeroFactor2);
         numInput.setValue("5562");
         await simulateUserWaiting(() => doneFunctionRan, 1000);
-        let visibleFactors = getVisibleFactors(xeroFactor2);
-        expect(visibleFactors.at(0).text()).toBe("(2)");
-        expect(visibleFactors.at(1).text()).toBe("(3)");
-        expect(visibleFactors.at(2).text()).toBe("(3)");
-        expect(visibleFactors.at(3).text()).toBe("(3)");
-        expect(visibleFactors.at(4).text()).toBe("(103)");
+        const visibleFactors = getVisibleFactors(xeroFactor2);
+        expect(visibleFactors.at(0)!.text()).toBe("(2)");
+        expect(visibleFactors.at(1)!.text()).toBe("(3)");
+        expect(visibleFactors.at(2)!.text()).toBe("(3)");
+        expect(visibleFactors.at(3)!.text()).toBe("(3)");
+        expect(visibleFactors.at(4)!.text()).toBe("(103)");
         expect(visibleFactors.length).toBe(5);
     });
     test("input number 2923675 produces prime factors '(5) (5) (83) (1409)'", async () => {
-        window.Worker = null;
+        Worker = null;
         let doneFunctionRan = false;
-        let workComplete = () => {
+        const workComplete = () => {
             
             doneFunctionRan = true;
         };
@@ -236,20 +237,20 @@ describe("for web worker disabled", () => {
                 done : workComplete
             }
         });
-        let numInput = getPrimaryNumberInput(xeroFactor2);
+        const numInput = getPrimaryNumberInput(xeroFactor2);
         numInput.setValue("2923675");
         await simulateUserWaiting(() => doneFunctionRan, 2000);
-        let visibleFactors = getVisibleFactors(xeroFactor2);
-        expect(visibleFactors.at(0).text()).toBe("(5)");
-        expect(visibleFactors.at(1).text()).toBe("(5)");
-        expect(visibleFactors.at(2).text()).toBe("(83)");
-        expect(visibleFactors.at(3).text()).toBe("(1409)");
+        const visibleFactors = getVisibleFactors(xeroFactor2);
+        expect(visibleFactors.at(0)!.text()).toBe("(5)");
+        expect(visibleFactors.at(1)!.text()).toBe("(5)");
+        expect(visibleFactors.at(2)!.text()).toBe("(83)");
+        expect(visibleFactors.at(3)!.text()).toBe("(1409)");
         expect(visibleFactors.length).toBe(4);
     });
     test("input number 29236752 produces prime factors '(2) (2) (2) (2) (3) (3) (191) (1063)'", async () => {
-        window.Worker = null;
+        Worker = () => null;
         let doneFunctionRan = false;
-        let workComplete = () => {
+        const workComplete = () => {
             doneFunctionRan = true;
         };
         xeroFactor2 = mount(XeroFactor2, {
@@ -257,24 +258,24 @@ describe("for web worker disabled", () => {
                 done : workComplete
             }
         });
-        let numInput = getPrimaryNumberInput(xeroFactor2);
+        const numInput = getPrimaryNumberInput(xeroFactor2);
         numInput.setValue("29236752");
         await simulateUserWaiting(() => doneFunctionRan, 2000);
-        let visibleFactors = getVisibleFactors(xeroFactor2);
-        expect(visibleFactors.at(0).text()).toBe("(2)");
-        expect(visibleFactors.at(1).text()).toBe("(2)");
-        expect(visibleFactors.at(2).text()).toBe("(2)");
-        expect(visibleFactors.at(3).text()).toBe("(2)");
-        expect(visibleFactors.at(4).text()).toBe("(3)");
-        expect(visibleFactors.at(5).text()).toBe("(3)");
-        expect(visibleFactors.at(6).text()).toBe("(191)");
-        expect(visibleFactors.at(7).text()).toBe("(1063)");
+        const visibleFactors = getVisibleFactors(xeroFactor2);
+        expect(visibleFactors.at(0)!.text()).toBe("(2)");
+        expect(visibleFactors.at(1)!.text()).toBe("(2)");
+        expect(visibleFactors.at(2)!.text()).toBe("(2)");
+        expect(visibleFactors.at(3)!.text()).toBe("(2)");
+        expect(visibleFactors.at(4)!.text()).toBe("(3)");
+        expect(visibleFactors.at(5)!.text()).toBe("(3)");
+        expect(visibleFactors.at(6)!.text()).toBe("(191)");
+        expect(visibleFactors.at(7)!.text()).toBe("(1063)");
         expect(visibleFactors.length).toBe(8);
     });
     test("mount without worker calls workerFound(false)", (done) => {
         xeroFactor2 = mount(XeroFactor2, {
             propsData : {
-                workerFound : (val) => {
+                workerFound : (val : boolean) => {
                     if (val) {
                         expect(false).toBeTruthy();
                         done();
@@ -285,7 +286,7 @@ describe("for web worker disabled", () => {
             }
         });
         // input is required to set the component in motion
-        let numInput = getPrimaryNumberInput(xeroFactor2);
+        const numInput = getPrimaryNumberInput(xeroFactor2);
         numInput.setValue("12");
     });
 });
@@ -293,15 +294,18 @@ describe("for web worker disabled", () => {
 
 describe("with mock worker", () => {
     test("mount with worker calls workerFound(true)", (done) => {
-        Worker = function () {
-            this.onmessage = () => {};
-            this.postMessage = () => {
-            };
-        };
+        class MyWorker extends window.Worker {
+            constructor () {
+                super("");
+            }
+            public onmessage = () => {};
+            public postMessage = () => {};
+        }
+
         xeroFactor2 = mount(XeroFactor2, {
             propsData : {
-                worker : new Worker(),
-                workerFound : (val) => {
+                worker : new MyWorker(),
+                workerFound : (val : boolean) => {
                     if (val) {
                         done();
                     } else {
@@ -312,16 +316,16 @@ describe("with mock worker", () => {
             }
         });
         // input is required to set the component in motion
-        let numInput = getPrimaryNumberInput(xeroFactor2);
+        const numInput = getPrimaryNumberInput(xeroFactor2);
         numInput.setValue("12");
     });
     test("factors 12 as (2)(2)(3)", (done) => {
-        let myWorker;
-        let myWorkDoneFunction = () => {
-            let visibleFactors = getVisibleFactors(xeroFactor2);
-            expect(visibleFactors.at(0).text()).toBe("(2)");
-            expect(visibleFactors.at(1).text()).toBe("(2)");
-            expect(visibleFactors.at(2).text()).toBe("(3)");
+        const myWorker = new WebWorker(["2", "2", "3"], 12);
+        const myWorkDoneFunction = () => {
+            const visibleFactors = getVisibleFactors(xeroFactor2);
+            expect(visibleFactors.at(0)!.text()).toBe("(2)");
+            expect(visibleFactors.at(1)!.text()).toBe("(2)");
+            expect(visibleFactors.at(2)!.text()).toBe("(3)");
             expect(visibleFactors.length).toBe(3);
             done();
         };
@@ -332,18 +336,17 @@ describe("with mock worker", () => {
                 "done" : myWorkDoneFunction
             }
         });
-        let numInput = getPrimaryNumberInput(xeroFactor2);
-        myWorker = new buildWebWorker(["2", "2", "3"], 12);
+        const numInput = getPrimaryNumberInput(xeroFactor2);
         xeroFactor2.vm.$nextTick(() => {
             numInput.setValue("12");
         });
     });
     test("factors 14 as (2)(7)", (done) => {
-        let myWorker;
-        let myWorkDoneFunction = () => {
-            let visibleFactors = getVisibleFactors(xeroFactor2);
-            expect(visibleFactors.at(0).text()).toBe("(2)");
-            expect(visibleFactors.at(1).text()).toBe("(7)");
+        const myWorker = new WebWorker(["2", "7"], 14);
+        const myWorkDoneFunction = () => {
+            const visibleFactors = getVisibleFactors(xeroFactor2);
+            expect(visibleFactors.at(0)!.text()).toBe("(2)");
+            expect(visibleFactors.at(1)!.text()).toBe("(7)");
             expect(visibleFactors.length).toBe(2);
             done();
         };
@@ -354,9 +357,8 @@ describe("with mock worker", () => {
                 "done" : myWorkDoneFunction
             }
         });
-        myWorker = new buildWebWorker(["2", "7"], 14);
         xeroFactor2.vm.$nextTick(() => {
-            let numInput = getPrimaryNumberInput(xeroFactor2);
+            const numInput = getPrimaryNumberInput(xeroFactor2);
             numInput.setValue("14");
         });
     });
