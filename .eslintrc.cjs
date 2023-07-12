@@ -64,7 +64,8 @@ module.exports = {
             "before" : true,
             "after" : true
         }],
-        "no-multiple-empty-lines" : ["error", { "max" : 2 }]
+        "no-multiple-empty-lines" : ["error", { "max" : 2 }],
+        "@typescript-eslint/no-non-null-assertion" : "off"
     },
     globals : {
         "env" : false,
