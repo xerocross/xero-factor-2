@@ -13,6 +13,8 @@ try {
         myWorker = new Worker(new URL("./get-factor-worker.ts", import.meta.url), {
             type : "module"
         });
+    } else {
+        myWorker = undefined;
     }
     createApp(XeroFactor2, {
         worker : myWorker,

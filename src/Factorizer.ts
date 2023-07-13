@@ -108,8 +108,6 @@ class Factorizer {
             key : key
         };
 
-
-
         return new Promise((nextFactorResolve) => {
             
             if (this.queryObject["worker"] == "false" || this.worker == undefined || this.worker == null) {

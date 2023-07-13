@@ -1,4 +1,4 @@
-import { defineComponent } from "vue";
+import { defineComponent, PropType } from "vue";
 import Debounce from "lodash.debounce";
 import { Decimal } from "decimal.js";
 import Factorizer from "../Factorizer";
@@ -8,8 +8,11 @@ import { letUs } from "@xerocross/literate";
 import WeAssert from "we-assert";
 import type { WaitFunction } from "../WaitFunction.d";
 import type { FactorRequest, FactoringEvent } from "../Factorizer.d";
+import type { MyWorker } from "./Xerofactor2.d";
 
 Decimal.set({ precision : 64 });
+const we = WeAssert.build();
+
 const { D } 
 = letUs("define Decimal alias", () => {
     const D = (x : string | number) => {
@@ -25,14 +28,12 @@ interface Factor {
     key : number
 }
 
-const we = WeAssert.build();
-
 export default defineComponent({
     name : "XeroFactor2",
     props : {
         worker : {
-            type : Object as () => Worker | null,
-            default : null
+            type : Object as PropType<MyWorker> | PropType<Worker> | undefined,
+            default : undefined
         },
         queryObject : {
             default : null
