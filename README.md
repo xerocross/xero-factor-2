@@ -16,6 +16,10 @@ I'm currently trying to refactor this app completely to use TypeScript. I realiz
 
 Almost everything seems to be working in TypeScript now except for my integration testing, which is currently broken. I'm working on repairing it.
 
+### Update (July 17)
+
+It has come to my attention that people don't write .d.ts files side-by-side with their .ts files. Maybe I should have bought a book on TypeScript or something. Anyway, I'm going to work to fix it.
+
 ## Technology
 
 This is a Vue 3 project. It's so simple there was no need for any special tools to manage state. I have used decimal.js for handling large numbers.
